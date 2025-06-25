@@ -369,12 +369,20 @@ with tab_feat_eng:
             df_fe['sale_amount_category'] = pd.cut(df_fe['sale_amount'], bins=bins, labels=labels, right=False)
             st.write("Se ha creado la característica `sale_amount_category`.")
             st.dataframe(df_fe[['sale_amount', 'sale_amount_category']].head())
+
             st.subheader("Distribución de `sale_amount_category`")
-            fig_price_cat = px.bar(df_fe['sale_amount_category'].value_counts().reset_index(name='Count'),
-                                   x='index', y='Count', title='Distribución por Categoría de Precio de Venta')
+            # --- FIX STARTS HERE ---
+            # Get value counts and reset index, then explicitly rename columns for clarity
+            price_category_counts = df_fe['sale_amount_category'].value_counts().reset_index()
+            price_category_counts.columns = ['Category', 'Count'] # Assign clear column names
+
+            fig_price_cat = px.bar(price_category_counts,
+                                   x='Category', y='Count', # Use the new explicit column names
+                                   title='Distribución por Categoría de Precio de Venta')
             st.plotly_chart(fig_price_cat, use_container_width=True)
         else:
             st.warning("Columna 'sale_amount' no disponible para crear `sale_amount_category`.")
+
 
         st.subheader("3. Indicadores Binarios (Ej. `is_commercial`)")
         if 'property_type' in df_fe.columns:
