@@ -54,11 +54,12 @@ def load_and_preprocess_data(url):
         df['sale_month'] = df['date_recorded'].dt.month_name()
         
         # FIX: Explicitly handle NaNs in sale_month by replacing NaT and then filling with 'Unknown'
-        df['sale_month'] = df['sale_month'].astype(str).replace('NaT', np.nan)
-        df['sale_month'].fillna('Unknown', inplace=True) 
+        # Changed: df['sale_month'].fillna('Unknown', inplace=True)
+        df['sale_month'] = df['sale_month'].astype(str).replace('NaT', np.nan).fillna('Unknown')
 
         # FIX: Convert 'date_recorded' to string AFTER extracting year and month
         # This is a robust way to avoid PyArrow Timestamp conversion issues
+        # No inplace for this one, already assigned directly
         df['date_recorded'] = df['date_recorded'].dt.strftime('%Y-%m-%d %H:%M:%S').fillna('') # Or just '%Y-%m-%d'
 
         # Limpiar columnas categóricas para filtros y análisis
@@ -66,7 +67,8 @@ def load_and_preprocess_data(url):
             if col in df.columns:
                 df[col] = df[col].astype(str).str.strip().replace('nan', np.nan)
                 # FIX: Fill NaNs for categorical features with 'Unknown' for PyArrow compatibility
-                df[col].fillna('Unknown', inplace=True)
+                # Changed: df[col].fillna('Unknown', inplace=True)
+                df[col] = df[col].fillna('Unknown')
 
         return df
     except Exception as e:
@@ -308,7 +310,7 @@ with tab_clean:
         if cols_to_drop_existing:
             st.write(f"Columnas candidatas a eliminación por muchos NaNs o irrelevancia: `{', '.join(cols_to_drop_existing)}`")
             if st.checkbox("Eliminar estas columnas para la demostración?", key="clean_drop_cols"):
-                df_cleaned_temp.drop(columns=cols_to_drop_existing, inplace=True)
+                df_cleaned_temp = df_cleaned_temp.drop(columns=cols_to_drop_existing) # Removed inplace
                 st.success(f"Columnas eliminadas. DataFrame ahora tiene {df_cleaned_temp.shape[1]} columnas.")
         else:
             st.info("Las columnas de ejemplo para eliminación no están presentes o ya fueron manejadas.")
@@ -323,11 +325,11 @@ with tab_clean:
                     key="impute_residential_type"
                 )
                 if imputation_option == "Imputar con 'Unknown'":
-                    df_cleaned_temp['residential_type'].fillna('Unknown', inplace=True)
+                    df_cleaned_temp['residential_type'] = df_cleaned_temp['residential_type'].fillna('Unknown') # Removed inplace
                     st.success("Valores faltantes en 'residential_type' imputados con 'Unknown'.")
                 elif imputation_option == "Imputar con la Moda":
                     mode_val = df_cleaned_temp['residential_type'].mode()[0]
-                    df_cleaned_temp['residential_type'].fillna(mode_val, inplace=True)
+                    df_cleaned_temp['residential_type'] = df_cleaned_temp['residential_type'].fillna(mode_val) # Removed inplace
                     st.success(f"Valores faltantes en 'residential_type' imputados con la moda: '{mode_val}'.")
                 st.write(f"Valores únicos después de imputación: {df_cleaned_temp['residential_type'].unique()}")
             else:
@@ -350,7 +352,7 @@ with tab_clean:
                         val = df_cleaned_temp[col].median()
                     else: # Media
                         val = df_cleaned_temp[col].mean()
-                    df_cleaned_temp[col].fillna(val, inplace=True)
+                    df_cleaned_temp[col] = df_cleaned_temp[col].fillna(val) # Removed inplace
                     st.success(f"Valores faltantes en '{col}' imputados con la {imputation_method.lower()}: {val:,.2f}.")
         else:
             st.info("No hay columnas numéricas con valores faltantes en el DataFrame actual.")
