@@ -40,27 +40,31 @@ def load_and_preprocess_data(url):
 
         # Conversión de tipos de datos
         df['date_recorded'] = pd.to_datetime(df['date_recorded'], errors='coerce')
-        # FIX: Ensure no timezone info for PyArrow compatibility
+        # FIX: Ensure no timezone info and convert to a standard representation for PyArrow
         if pd.api.types.is_datetime64_any_dtype(df['date_recorded']):
             df['date_recorded'] = df['date_recorded'].dt.tz_localize(None)
+            # Optional: Convert to milliseconds since epoch or just a date string if issues persist
+            # df['date_recorded'] = df['date_recorded'].dt.date # Keep only date part as datetime.date object
+            # df['date_recorded'] = df['date_recorded'].dt.strftime('%Y-%m-%d') # Convert to string if all else fails
 
         df['assessed_value'] = pd.to_numeric(df['assessed_value'], errors='coerce')
         df['sale_amount'] = pd.to_numeric(df['sale_amount'], errors='coerce')
         df['sales_ratio'] = pd.to_numeric(df['sales_ratio'], errors='coerce')
 
         # Extraer año y mes de la fecha
-        df['sale_year'] = df['date_recorded'].dt.year.astype('Int64') # Int64 para manejar NaNs en enteros
+        # Handle potential NaT from date_recorded before extracting year/month
+        df['sale_year'] = df['date_recorded'].dt.year.astype('Int64') # Int64 to handle NaNs in integers
         df['sale_month'] = df['date_recorded'].dt.month_name()
-        # FIX: Explicitly handle NaNs in sale_month by replacing NaT and then filling
+        
+        # FIX: Explicitly handle NaNs in sale_month by replacing NaT and then filling with 'Unknown'
         df['sale_month'] = df['sale_month'].astype(str).replace('NaT', np.nan)
-        df['sale_month'].fillna('Unknown', inplace=True) # Fill NaNs for consistency
-
+        df['sale_month'].fillna('Unknown', inplace=True) 
 
         # Limpiar columnas categóricas para filtros y análisis
         for col in ['town', 'property_type', 'residential_type']:
             if col in df.columns:
                 df[col] = df[col].astype(str).str.strip().replace('nan', np.nan)
-                # FIX: Fill NaNs for categorical features for PyArrow compatibility
+                # FIX: Fill NaNs for categorical features with 'Unknown' for PyArrow compatibility
                 df[col].fillna('Unknown', inplace=True)
 
         return df
@@ -201,7 +205,9 @@ with tab_eda:
         st.dataframe(df_filtered.dtypes.astype(str).reset_index().rename(columns={0: 'Tipo de Dato', 'index': 'Columna'}))
 
         st.subheader("Estadísticas Descriptivas de Columnas Numéricas")
-        st.dataframe(df_filtered.describe().T)
+        # FIX: Only describe numeric columns to avoid issues with date_recorded or other non-numeric types
+        # that might be misinterpreted by describe().T
+        st.dataframe(df_filtered.select_dtypes(include=np.number).describe().T)
 
         st.header("2. Manejo de Valores Faltantes (NaNs) (Filtros Aplicados)")
         missing_data_filtered = df_filtered.isnull().sum()
@@ -286,7 +292,7 @@ with tab_clean:
             'Total Faltantes': missing_info_current,
             'Porcentaje (%)': missing_percentage_current[missing_info_current.index].round(2)
         })
-        if not current_missing_df.empty:
+        if not missing_info_current.empty:
             st.dataframe(current_missing_df)
         else:
             st.info("¡No hay valores faltantes en el DataFrame actual (filtrado)! Excelente.")
@@ -386,13 +392,8 @@ with tab_feat_eng:
             st.dataframe(df_fe[['sale_amount', 'sale_amount_category']].head())
 
             st.subheader("Distribución de `sale_amount_category`")
-            # FIX: Correct column naming for px.bar after value_counts().reset_index()
-            # value_counts().reset_index() by default names the category column after the series it came from.
-            # And 'name='Count'' names the count column.
             price_category_counts = df_fe['sale_amount_category'].value_counts().reset_index(name='Count')
 
-            # The default column names will be ['sale_amount_category', 'Count']
-            # So, we use those names directly for x and y.
             fig_price_cat = px.bar(price_category_counts,
                                    x='sale_amount_category', y='Count',
                                    title='Distribución por Categoría de Precio de Venta')
@@ -582,7 +583,7 @@ with tab_modeling:
 
         st.write("##### Escalado de Características Numéricas")
         # Identify numeric columns for scaling that are not the target and exist in the dataframe
-        numeric_features_for_scaling = [col for col in ['assessed_value', 'list_year'] if col in df_model.columns and col != target]
+        numeric_features_for_scaling = [col for col in ['assessed_value', 'list_year'] if col in df_model.columns and col != 'sale_amount'] # explicit target name for safety
 
         if numeric_features_for_scaling:
             scaler = StandardScaler()
@@ -615,9 +616,6 @@ with tab_modeling:
 
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-        st.write(f"Conjunto de entrenamiento: {X_train.shape[0]} muestras")
-        st.write(f"Conjunto de prueba: {X_test.shape[0]} muestras")
-
         st.subheader("3. Entrenamiento y Evaluación del Modelo (Random Forest Regressor)")
         if st.button("Entrenar Modelo"):
             # Check if training data is valid
@@ -639,15 +637,15 @@ with tab_modeling:
                 st.info("Un MAE indica el error promedio en las predicciones del precio de venta.")
 
                 st.subheader("Importancia de las Características (Top 10)")
-                # Ensure feature importances are shown only if model was trained
-                if hasattr(model, 'feature_importances_'):
+                # Ensure feature importances are shown only if model was trained and features exist
+                if hasattr(model, 'feature_importances_') and not X.columns.empty:
                     feature_importances = pd.Series(model.feature_importances_, index=X.columns).sort_values(ascending=False)
                     fig_importance = px.bar(feature_importances.head(10),
                                             title="Importancia de las Características en el Modelo",
                                             labels={'value': 'Importancia', 'index': 'Característica'})
                     st.plotly_chart(fig_importance, use_container_width=True)
                 else:
-                    st.info("No se pudo calcular la importancia de las características.")
+                    st.info("No se pudo calcular la importancia de las características, o no hay características para mostrar.")
 
         else:
             st.info("Haz clic en 'Entrenar Modelo' para ver los resultados.")
