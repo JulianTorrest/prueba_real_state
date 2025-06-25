@@ -6,7 +6,7 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, r2_score
-from sklearn.preprocessing import LabelEncoder, StandardScaler # Importar StandardScaler
+from sklearn.preprocessing import StandardScaler
 
 # --- Configuración de la aplicación Streamlit ---
 st.set_page_config(
@@ -40,6 +40,10 @@ def load_and_preprocess_data(url):
 
         # Conversión de tipos de datos
         df['date_recorded'] = pd.to_datetime(df['date_recorded'], errors='coerce')
+        # FIX: Ensure no timezone info for PyArrow compatibility
+        if pd.api.types.is_datetime64_any_dtype(df['date_recorded']):
+            df['date_recorded'] = df['date_recorded'].dt.tz_localize(None)
+
         df['assessed_value'] = pd.to_numeric(df['assessed_value'], errors='coerce')
         df['sale_amount'] = pd.to_numeric(df['sale_amount'], errors='coerce')
         df['sales_ratio'] = pd.to_numeric(df['sales_ratio'], errors='coerce')
@@ -47,11 +51,17 @@ def load_and_preprocess_data(url):
         # Extraer año y mes de la fecha
         df['sale_year'] = df['date_recorded'].dt.year.astype('Int64') # Int64 para manejar NaNs en enteros
         df['sale_month'] = df['date_recorded'].dt.month_name()
+        # FIX: Explicitly handle NaNs in sale_month by replacing NaT and then filling
+        df['sale_month'] = df['sale_month'].astype(str).replace('NaT', np.nan)
+        df['sale_month'].fillna('Unknown', inplace=True) # Fill NaNs for consistency
+
 
         # Limpiar columnas categóricas para filtros y análisis
         for col in ['town', 'property_type', 'residential_type']:
             if col in df.columns:
                 df[col] = df[col].astype(str).str.strip().replace('nan', np.nan)
+                # FIX: Fill NaNs for categorical features for PyArrow compatibility
+                df[col].fillna('Unknown', inplace=True)
 
         return df
     except Exception as e:
@@ -74,7 +84,8 @@ df_filtered = df_original.copy()
 
 # 1. Filtro por Rango de Años de Venta (sale_year)
 if 'sale_year' in df_filtered.columns and not df_filtered['sale_year'].isnull().all():
-    min_year, max_year = int(df_filtered['sale_year'].min()), int(df_filtered['sale_year'].max())
+    min_year = int(df_filtered['sale_year'].min()) if not df_filtered['sale_year'].isnull().all() else 2001
+    max_year = int(df_filtered['sale_year'].max()) if not df_filtered['sale_year'].isnull().all() else 2022
     selected_years = st.sidebar.slider(
         "Rango de Años de Venta:",
         min_value=min_year,
@@ -92,7 +103,7 @@ else:
 if 'sale_month' in df_filtered.columns and not df_filtered['sale_month'].isnull().all():
     all_months = df_filtered['sale_month'].dropna().unique().tolist()
     month_order = ["January", "February", "March", "April", "May", "June",
-                   "July", "August", "September", "October", "November", "December"]
+                   "July", "August", "September", "October", "November", "December", "Unknown"] # Include 'Unknown'
     all_months_sorted = [m for m in month_order if m in all_months]
 
     selected_months = st.sidebar.multiselect(
@@ -135,14 +146,17 @@ else:
 
 # 5. Filtro por Tipo Residencial (residential_type)
 if 'residential_type' in df_filtered.columns and not df_filtered['residential_type'].isnull().all():
-    # Solo mostrar tipos residenciales si 'Residential' está en los tipos de propiedad seleccionados
-    if 'Residential' in selected_property_types:
+    # Only show residential types if 'Residential' is selected AND there are actual residential properties
+    if 'Residential' in selected_property_types and any(df_filtered['property_type'] == 'Residential'):
         all_residential_types = df_filtered['residential_type'].dropna().unique().tolist()
+        # Filter out 'Unknown' if it's the only type left due to filtering
+        if 'Unknown' in all_residential_types and len(all_residential_types) > 1:
+             all_residential_types.remove('Unknown') # Remove 'Unknown' for better default selection
         all_residential_types.sort()
         selected_residential_types = st.sidebar.multiselect(
             "Selecciona Tipo Residencial:",
             options=all_residential_types,
-            default=all_residential_types
+            default=all_residential_types # Select all available non-Unknown by default
         )
         if selected_residential_types:
             df_filtered = df_filtered[df_filtered['residential_type'].isin(selected_residential_types)]
@@ -202,7 +216,7 @@ with tab_eda:
             st.dataframe(missing_info_filtered)
             st.info("Columnas con alta proporción de valores faltantes podrían requerir imputación cuidadosa o exclusión. Explora la pestaña 'Limpieza Avanzada'.")
         else:
-            st.info("¡No hay valores faltantes en el dataset filtrado!")
+            st.info("¡No hay valores faltantes en el dataset filtrado! Excelente.")
 
         st.header("3. Visualizaciones Clave (Filtros Aplicados)")
 
@@ -278,12 +292,12 @@ with tab_clean:
             st.info("¡No hay valores faltantes en el DataFrame actual (filtrado)! Excelente.")
 
         st.markdown("---")
-        st.subheader("Estrategias de Imputación/Eliminación")
+        st.subheader("Estrategias de Imputación/Eliminación (Demostración)")
 
         df_cleaned_temp = df_filtered.copy() # Copia temporal para demostración de limpieza
 
-        st.write("#### 1. Columnas con alta proporción de NaNs (Ejemplo: `non_use_code`, `assessor_remarks`, `opm_remarks`)")
-        cols_to_drop = ['non_use_code', 'assessor_remarks', 'opm_remarks', 'location'] # 'location' si no se va a usar para geomapping
+        st.write("#### 1. Columnas con alta proporción de NaNs (Ejemplo: `non_use_code`, `assessor_remarks`, `opm_remarks`, `location`)")
+        cols_to_drop = ['non_use_code', 'assessor_remarks', 'opm_remarks', 'location']
         cols_to_drop_existing = [col for col in cols_to_drop if col in df_cleaned_temp.columns]
         if cols_to_drop_existing:
             st.write(f"Columnas candidatas a eliminación por muchos NaNs o irrelevancia: `{', '.join(cols_to_drop_existing)}`")
@@ -366,23 +380,26 @@ with tab_feat_eng:
         if 'sale_amount' in df_fe.columns and not df_fe['sale_amount'].isnull().all():
             bins = [0, 100000, 300000, 700000, np.inf]
             labels = ['0-100K', '100K-300K', '300K-700K', '700K+']
+            # Ensure sale_amount_category has categories if it was potentially empty before
             df_fe['sale_amount_category'] = pd.cut(df_fe['sale_amount'], bins=bins, labels=labels, right=False)
             st.write("Se ha creado la característica `sale_amount_category`.")
             st.dataframe(df_fe[['sale_amount', 'sale_amount_category']].head())
 
             st.subheader("Distribución de `sale_amount_category`")
-            # --- FIX STARTS HERE ---
-            # Get value counts and reset index, then explicitly rename columns for clarity
-            price_category_counts = df_fe['sale_amount_category'].value_counts().reset_index()
-            price_category_counts.columns = ['Category', 'Count'] # Assign clear column names
+            # FIX: Correct column naming for px.bar after value_counts().reset_index()
+            # value_counts().reset_index() by default names the category column after the series it came from.
+            # And 'name='Count'' names the count column.
+            price_category_counts = df_fe['sale_amount_category'].value_counts().reset_index(name='Count')
 
+            # The default column names will be ['sale_amount_category', 'Count']
+            # So, we use those names directly for x and y.
             fig_price_cat = px.bar(price_category_counts,
-                                   x='Category', y='Count', # Use the new explicit column names
+                                   x='sale_amount_category', y='Count',
                                    title='Distribución por Categoría de Precio de Venta')
+
             st.plotly_chart(fig_price_cat, use_container_width=True)
         else:
             st.warning("Columna 'sale_amount' no disponible para crear `sale_amount_category`.")
-
 
         st.subheader("3. Indicadores Binarios (Ej. `is_commercial`)")
         if 'property_type' in df_fe.columns:
@@ -493,9 +510,13 @@ with tab_bivariate:
         st.subheader("2. Distribución de Precio de Venta por Mes")
         if 'sale_month' in df_filtered.columns and 'sale_amount' in df_filtered.columns:
             month_order = ["January", "February", "March", "April", "May", "June",
-                           "July", "August", "September", "October", "November", "December"]
+                           "July", "August", "September", "October", "November", "December", "Unknown"]
             df_plot = df_filtered.copy()
-            df_plot['sale_month'] = pd.Categorical(df_plot['sale_month'], categories=month_order, ordered=True)
+            # Ensure 'Unknown' is in categories if present
+            current_months = df_plot['sale_month'].dropna().unique().tolist()
+            final_month_order = [m for m in month_order if m in current_months]
+
+            df_plot['sale_month'] = pd.Categorical(df_plot['sale_month'], categories=final_month_order, ordered=True)
             df_plot.sort_values('sale_month', inplace=True)
 
             fig_box_month = px.box(df_plot, x='sale_month', y='sale_amount',
@@ -539,7 +560,10 @@ with tab_modeling:
         st.write("##### Manejo de NaNs (Estrategia para el Modelo)")
         # Para el modelado, seremos más agresivos con los NaNs en columnas clave
         cols_for_model = ['assessed_value', 'list_year', 'property_type', 'town', 'residential_type', 'sale_amount']
-        df_model = df_model[cols_for_model].dropna() # Eliminar filas con NaNs en estas columnas
+        
+        # Ensure all columns in `cols_for_model` actually exist in df_model
+        cols_for_model_existing = [col for col in cols_for_model if col in df_model.columns]
+        df_model = df_model[cols_for_model_existing].dropna() # Eliminar filas con NaNs en estas columnas
 
         if df_model.empty:
             st.warning("El DataFrame para el modelado está vacío después de eliminar NaNs. Ajusta tus filtros o reconsidera las columnas a usar.")
@@ -557,8 +581,8 @@ with tab_modeling:
             st.info("No hay columnas categóricas válidas para One-Hot Encoding.")
 
         st.write("##### Escalado de Características Numéricas")
-        numeric_features_for_scaling = ['assessed_value', 'list_year']
-        numeric_features_for_scaling = [col for col in numeric_features_for_scaling if col in df_model.columns]
+        # Identify numeric columns for scaling that are not the target and exist in the dataframe
+        numeric_features_for_scaling = [col for col in ['assessed_value', 'list_year'] if col in df_model.columns and col != target]
 
         if numeric_features_for_scaling:
             scaler = StandardScaler()
@@ -570,10 +594,21 @@ with tab_modeling:
 
         st.subheader("2. Selección de Características y División de Datos")
         target = 'sale_amount'
+        
+        # Check if target column exists after preprocessing
+        if target not in df_model.columns:
+            st.warning(f"La columna objetivo '{target}' no está disponible después del preprocesamiento.")
+            st.stop()
+
         # Quitar la variable objetivo de las características
         X = df_model.drop(columns=[target])
         y = df_model[target]
 
+        # Ensure X is not empty after dropping target
+        if X.empty:
+            st.warning("No hay características disponibles para el entrenamiento del modelo después del preprocesamiento.")
+            st.stop()
+        
         st.write(f"**Características (X) para el modelo:**")
         st.write(X.columns.tolist())
         st.write(f"**Variable Objetivo (y):** {target}")
@@ -585,26 +620,34 @@ with tab_modeling:
 
         st.subheader("3. Entrenamiento y Evaluación del Modelo (Random Forest Regressor)")
         if st.button("Entrenar Modelo"):
-            model = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
-            model.fit(X_train, y_train)
-            st.success("Modelo Random Forest Regressor entrenado exitosamente.")
+            # Check if training data is valid
+            if X_train.shape[0] == 0 or X_train.shape[1] == 0:
+                st.error("No hay datos de entrenamiento válidos para el modelo. Ajusta los filtros o los datos de entrada.")
+            else:
+                model = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
+                model.fit(X_train, y_train)
+                st.success("Modelo Random Forest Regressor entrenado exitosamente.")
 
-            y_pred = model.predict(X_test)
-            mae = mean_absolute_error(y_test, y_pred)
-            r2 = r2_score(y_test, y_pred)
+                y_pred = model.predict(X_test)
+                mae = mean_absolute_error(y_test, y_pred)
+                r2 = r2_score(y_test, y_pred)
 
-            st.write(f"**Error Absoluto Medio (MAE):** ${mae:,.2f}")
-            st.write(f"**Coeficiente de Determinación (R2):** {r2:.4f}")
+                st.write(f"**Error Absoluto Medio (MAE):** ${mae:,.2f}")
+                st.write(f"**Coeficiente de Determinación (R2):** {r2:.4f}")
 
-            st.info("Un R2 cercano a 1 indica que el modelo explica una gran parte de la varianza del precio de venta.")
-            st.info("Un MAE indica el error promedio en las predicciones del precio de venta.")
+                st.info("Un R2 cercano a 1 indica que el modelo explica una gran parte de la varianza del precio de venta.")
+                st.info("Un MAE indica el error promedio en las predicciones del precio de venta.")
 
-            st.subheader("Importancia de las Características (Top 10)")
-            feature_importances = pd.Series(model.feature_importances_, index=X.columns).sort_values(ascending=False)
-            fig_importance = px.bar(feature_importances.head(10),
-                                    title="Importancia de las Características en el Modelo",
-                                    labels={'value': 'Importancia', 'index': 'Característica'})
-            st.plotly_chart(fig_importance, use_container_width=True)
+                st.subheader("Importancia de las Características (Top 10)")
+                # Ensure feature importances are shown only if model was trained
+                if hasattr(model, 'feature_importances_'):
+                    feature_importances = pd.Series(model.feature_importances_, index=X.columns).sort_values(ascending=False)
+                    fig_importance = px.bar(feature_importances.head(10),
+                                            title="Importancia de las Características en el Modelo",
+                                            labels={'value': 'Importancia', 'index': 'Característica'})
+                    st.plotly_chart(fig_importance, use_container_width=True)
+                else:
+                    st.info("No se pudo calcular la importancia de las características.")
 
         else:
             st.info("Haz clic en 'Entrenar Modelo' para ver los resultados.")
