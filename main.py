@@ -392,10 +392,12 @@ with tab_feat_eng:
             st.dataframe(df_fe[['sale_amount', 'sale_amount_category']].head())
 
             st.subheader("Distribución de `sale_amount_category`")
-            price_category_counts = df_fe['sale_amount_category'].value_counts().reset_index(name='Count')
+            price_category_counts = df_fe['sale_amount_category'].value_counts().reset_index()
+            # FIX: Rename the columns of price_category_counts for Plotly Express
+            price_category_counts.columns = ['Sale_Amount_Category', 'Count'] # Renamed 'index' to 'Sale_Amount_Category'
 
             fig_price_cat = px.bar(price_category_counts,
-                                   x='sale_amount_category', y='Count',
+                                   x='Sale_Amount_Category', y='Count', # Use the new column name here
                                    title='Distribución por Categoría de Precio de Venta')
 
             st.plotly_chart(fig_price_cat, use_container_width=True)
