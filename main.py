@@ -298,28 +298,35 @@ else:
     else:
         st.warning("No se pudo realizar el análisis temporal sin la columna 'sale_year' en los datos filtrados.")
 
-else:
-    st.error("El DataFrame filtrado está vacío. No se puede realizar el análisis de datos.")
-
-
 # --- Conclusión del EDA ---
 st.header("6. Conclusiones y Próximos Pasos del EDA")
-st.write("""
-    Este EDA interactivo permite explorar los datos de ventas inmobiliarias aplicando diversos filtros.
-    Las visualizaciones y estadísticas se actualizan automáticamente para reflejar los datos seleccionados.
 
-    **Puntos clave:**
-    * **Interactividad:** Los deslizadores y selectores permiten una exploración profunda de subconjuntos de datos.
-    * **Robustez:** Se han incluido comprobaciones para columnas ausentes o vacías, y se manejan los `NaNs` para evitar errores.
-    * **Preprocesamiento:** Las columnas han sido renombradas y convertidas a tipos de datos adecuados en la función `load_data`.
+# The 'else' at line 301 is likely related to this 'if' block below
+# or one of the previous numerical/temporal analysis blocks.
+# Ensure the 'if' that this 'else' corresponds to is correctly structured.
+if not df_filtered.empty: # This 'if' block started on line ~200, so this 'else' should correspond to it.
+    st.write("""
+        Este EDA interactivo permite explorar los datos de ventas inmobiliarias aplicando diversos filtros.
+        Las visualizaciones y estadísticas se actualizan automáticamente para reflejar los datos seleccionados.
 
-    **Próximos pasos sugeridos:**
-    1.  **Limpieza Avanzada:** Decidir estrategias específicas para imputar o manejar valores faltantes en las columnas clave.
-    2.  **Ingeniería de Características:** Por ejemplo, combinar 'town' y 'property_type' o crear categorías de precios.
-    3.  **Detección de Outliers:** Utilizar métodos estadísticos para identificar y manejar transacciones atípicas.
-    4.  **Análisis Bivariado/Multivariado:** Explorar las relaciones entre más de dos variables a la vez.
-    5.  **Modelado Predictivo:** Utilizar estos datos para construir modelos que predigan precios de venta.
-""")
+        **Puntos clave:**
+        * **Interactividad:** Los deslizadores y selectores permiten una exploración profunda de subconjuntos de datos.
+        * **Robustez:** Se han incluido comprobaciones para columnas ausentes o vacías, y se manejan los `NaNs` para evitar errores.
+        * **Preprocesamiento:** Las columnas han sido renombradas y convertidas a tipos de datos adecuados en la función `load_data`.
+
+        **Próximos pasos sugeridos:**
+        1.  **Limpieza Avanzada:** Decidir estrategias específicas para imputar o manejar valores faltantes en las columnas clave.
+        2.  **Ingeniería de Características:** Por ejemplo, combinar 'town' y 'property_type' o crear categorías de precios.
+        3.  **Detección de Outliers:** Utilizar métodos estadísticos para identificar y manejar transacciones atípicas.
+        4.  **Análisis Bivariado/Multivariado:** Explorar las relaciones entre más de dos variables a la vez.
+        5.  **Modelado Predictivo:** Utilizar estos datos para construir modelos que predigan precios de venta.
+    """)
+
+# The 'else' that was throwing the error was likely here,
+# and it belongs to the 'if not df_filtered.empty:' block that starts much earlier.
+else: # This 'else' correctly belongs to the 'if not df_filtered.empty:' block.
+    st.error("El DataFrame filtrado está vacío. No se puede realizar el análisis de datos.")
+
 
 st.markdown("---")
 st.caption("Aplicación creada con Streamlit. Datos de JulianTorrest/prueba_real_state.")
