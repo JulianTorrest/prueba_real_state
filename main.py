@@ -39,26 +39,27 @@ def load_and_preprocess_data(url):
         df.columns = df.columns.str.strip().str.replace(' ', '_').str.replace('_-', '_').str.replace('.', '', regex=False).str.lower()
 
         # Conversión de tipos de datos
-        df['date_recorded'] = pd.to_datetime(df['date_recorded'], errors='coerce')
-        # FIX: Ensure no timezone info and convert to a standard representation for PyArrow
-        if pd.api.types.is_datetime64_any_dtype(df['date_recorded']):
-            df['date_recorded'] = df['date_recorded'].dt.tz_localize(None)
-            # Optional: Convert to milliseconds since epoch or just a date string if issues persist
-            # df['date_recorded'] = df['date_recorded'].dt.date # Keep only date part as datetime.date object
-            # df['date_recorded'] = df['date_recorded'].dt.strftime('%Y-%m-%d') # Convert to string if all else fails
-
         df['assessed_value'] = pd.to_numeric(df['assessed_value'], errors='coerce')
         df['sale_amount'] = pd.to_numeric(df['sale_amount'], errors='coerce')
         df['sales_ratio'] = pd.to_numeric(df['sales_ratio'], errors='coerce')
 
+        # Convert date_recorded to datetime, handle errors, and remove timezone
+        df['date_recorded'] = pd.to_datetime(df['date_recorded'], errors='coerce')
+        if pd.api.types.is_datetime64_any_dtype(df['date_recorded']):
+            df['date_recorded'] = df['date_recorded'].dt.tz_localize(None)
+
         # Extraer año y mes de la fecha
-        # Handle potential NaT from date_recorded before extracting year/month
-        df['sale_year'] = df['date_recorded'].dt.year.astype('Int64') # Int64 to handle NaNs in integers
+        # These operations need date_recorded to be a datetime
+        df['sale_year'] = df['date_recorded'].dt.year.astype('Int64') # Int64 para manejar NaNs en enteros
         df['sale_month'] = df['date_recorded'].dt.month_name()
         
         # FIX: Explicitly handle NaNs in sale_month by replacing NaT and then filling with 'Unknown'
         df['sale_month'] = df['sale_month'].astype(str).replace('NaT', np.nan)
         df['sale_month'].fillna('Unknown', inplace=True) 
+
+        # FIX: Convert 'date_recorded' to string AFTER extracting year and month
+        # This is a robust way to avoid PyArrow Timestamp conversion issues
+        df['date_recorded'] = df['date_recorded'].dt.strftime('%Y-%m-%d %H:%M:%S').fillna('') # Or just '%Y-%m-%d'
 
         # Limpiar columnas categóricas para filtros y análisis
         for col in ['town', 'property_type', 'residential_type']:
@@ -205,8 +206,7 @@ with tab_eda:
         st.dataframe(df_filtered.dtypes.astype(str).reset_index().rename(columns={0: 'Tipo de Dato', 'index': 'Columna'}))
 
         st.subheader("Estadísticas Descriptivas de Columnas Numéricas")
-        # FIX: Only describe numeric columns to avoid issues with date_recorded or other non-numeric types
-        # that might be misinterpreted by describe().T
+        # Ensure only numeric columns are described, avoiding any potential timestamp issues
         st.dataframe(df_filtered.select_dtypes(include=np.number).describe().T)
 
         st.header("2. Manejo de Valores Faltantes (NaNs) (Filtros Aplicados)")
