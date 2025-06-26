@@ -11,7 +11,7 @@ from sklearn.preprocessing import StandardScaler
 # --- Configuración de la aplicación Streamlit ---
 st.set_page_config(
     page_title="Análisis Completo de Ventas Inmobiliarias",
-    page_icon="🏠",
+    page_icon="�",
     layout="wide" # Usa todo el ancho de la pantalla
 )
 
@@ -34,6 +34,7 @@ def load_and_preprocess_data(url):
     Se han especificado los tipos de datos para evitar la advertencia de 'DtypeWarning'
     y asegurar la correcta interpretación de las columnas.
     """
+    print("DEBUG: Iniciando carga y preprocesamiento de datos...")
     try:
         # Especificar los tipos de datos directamente para las columnas problemáticas
         # Esto ayuda a evitar la DtypeWarning y asegura la consistencia de los datos.
@@ -54,57 +55,68 @@ def load_and_preprocess_data(url):
             'OPM remarks': str,
             'Location': str
         }, low_memory=False) # low_memory=False se usa como un fallback adicional, aunque dtypes es más específico
+        print(f"DEBUG: CSV cargado exitosamente. Filas: {df.shape[0]}, Columnas: {df.shape[1]}")
 
         # Renombrar columnas para facilitar el uso
+        original_cols = df.columns.tolist()
         df.columns = df.columns.str.strip().str.replace(' ', '_').str.replace('_-', '_').str.replace('.', '', regex=False).str.lower()
+        print("DEBUG: Columnas renombradas a minúsculas y con guiones bajos.")
+        
+        # Opcional: Verificar que las columnas importantes se hayan renombrado correctamente
+        expected_renamed_cols = ['sales_ratio', 'property_type', 'residential_type', 'non_use_code', 'assessor_remarks', 'opm_remarks', 'location']
+        for o_col, n_col in zip(original_cols, df.columns):
+            if o_col in ['Sales Ratio', 'Property Type', 'Residential Type', 'Non Use Code', 'Assessor Remarks', 'OPM remarks', 'Location']:
+                print(f"DEBUG: Columna '{o_col}' renombrada a '{n_col}'.")
+
 
         # Conversión de tipos de datos
         # pd.to_numeric con errors='coerce' maneja cualquier valor no numérico a NaN
         df['assessed_value'] = pd.to_numeric(df['assessed_value'], errors='coerce')
         df['sale_amount'] = pd.to_numeric(df['sale_amount'], errors='coerce')
-        # 'sales_ratio' ya se definió como float en dtype, pero lo volvemos a asegurar
         df['sales_ratio'] = pd.to_numeric(df['sales_ratio'], errors='coerce')
+        print("DEBUG: Columnas numéricas convertidas.")
 
         # Convert date_recorded to datetime, handle errors, and remove timezone
         df['date_recorded'] = pd.to_datetime(df['date_recorded'], errors='coerce')
         if pd.api.types.is_datetime64_any_dtype(df['date_recorded']):
             df['date_recorded'] = df['date_recorded'].dt.tz_localize(None)
+        print("DEBUG: 'date_recorded' procesada.")
 
         # Extraer año y mes de la fecha
-        # These operations need date_recorded to be a datetime
         df['sale_year'] = df['date_recorded'].dt.year.astype('Int64') # Int64 para manejar NaNs en enteros
         df['sale_month'] = df['date_recorded'].dt.month_name()
+        print("DEBUG: 'sale_year' y 'sale_month' extraídas.")
         
-        # FIX: Explicitly handle NaNs in sale_month by replacing NaT and then filling with 'Unknown'
-        # Changed: df['sale_month'].fillna('Unknown', inplace=True)
         df['sale_month'] = df['sale_month'].astype(str).replace('NaT', np.nan).fillna('Unknown')
 
-        # FIX: Convert 'date_recorded' to string AFTER extracting year and month
-        # This is a robust way to avoid PyArrow Timestamp conversion issues
-        # No inplace for this one, already assigned directly
-        df['date_recorded'] = df['date_recorded'].dt.strftime('%Y-%m-%d %H:%M:%S').fillna('') # Or just '%Y-%m-%d'
+        df['date_recorded'] = df['date_recorded'].dt.strftime('%Y-%m-%d %H:%M:%S').fillna('')
 
         # Limpiar columnas categóricas para filtros y análisis
         for col in ['town', 'property_type', 'residential_type', 'non_use_code', 'assessor_remarks', 'opm_remarks', 'location']:
             if col in df.columns:
-                # Asegurar que sean strings y manejar 'nan' literal a np.nan, luego rellenar con 'Unknown'
                 df[col] = df[col].astype(str).str.strip().replace('nan', np.nan)
-                df[col] = df[col].fillna('Unknown') # Rellena NaNs con 'Unknown' para coherencia
+                df[col] = df[col].fillna('Unknown')
+                print(f"DEBUG: Columna categórica '{col}' limpiada y NaNs rellenados.")
 
+        print("DEBUG: Preprocesamiento de datos completado.")
         return df
     except Exception as e:
+        print(f"ERROR: Fallo en load_and_preprocess_data: {e}")
         st.error(f"Error al intentar cargar o preprocesar el archivo CSV: {e}")
         st.info("Asegúrate de que la URL sea correcta y que el archivo sea un CSV válido.")
         st.exception(e) # Muestra el traceback completo en la aplicación
         return pd.DataFrame()
 
 # --- Cargar los Datos Originales ---
+print("DEBUG: Llamando a load_and_preprocess_data...")
 df_original = load_and_preprocess_data(CSV_URL)
+print(f"DEBUG: df_original cargado. Vacío: {df_original.empty}")
 
 if df_original.empty:
     st.warning("No se pudieron cargar los datos o el DataFrame está vacío. No se puede continuar con el análisis.")
     st.stop() # Detiene la ejecución si no hay datos
 
+print("DEBUG: Iniciando sección de filtros de la barra lateral...")
 # --- Sidebar para Filtros (aplicados a todas las pestañas) ---
 st.sidebar.header("Filtros de Datos")
 st.sidebar.info("Usa los filtros a continuación para segmentar los datos en todas las secciones de la aplicación.")
@@ -128,9 +140,12 @@ try:
         ]
     else:
         st.sidebar.warning("Columna 'sale_year' no disponible o vacía para filtrar.")
+    print("DEBUG: Filtro 'Rango de Años de Venta' procesado.")
 except Exception as e:
     st.sidebar.error(f"Error en el filtro 'Rango de Años de Venta': {e}")
     st.sidebar.exception(e)
+    print(f"ERROR: Filtro 'Rango de Años de Venta' falló: {e}")
+
 
 # 2. Filtro por Mes de Venta (sale_month)
 try:
@@ -149,9 +164,11 @@ try:
             df_filtered = df_filtered[df_filtered['sale_month'].isin(selected_months)]
     else:
         st.sidebar.warning("Columna 'sale_month' no disponible o vacía para filtrar.")
+    print("DEBUG: Filtro 'Mes de Venta' procesado.")
 except Exception as e:
     st.sidebar.error(f"Error en el filtro 'Mes de Venta': {e}")
     st.sidebar.exception(e)
+    print(f"ERROR: Filtro 'Mes de Venta' falló: {e}")
 
 # 3. Filtro por Ciudad (town)
 try:
@@ -167,9 +184,11 @@ try:
             df_filtered = df_filtered[df_filtered['town'].isin(selected_towns)]
     else:
         st.sidebar.warning("Columna 'town' no disponible o vacía para filtrar.")
+    print("DEBUG: Filtro 'Ciudad' procesado.")
 except Exception as e:
     st.sidebar.error(f"Error en el filtro 'Ciudad': {e}")
     st.sidebar.exception(e)
+    print(f"ERROR: Filtro 'Ciudad' falló: {e}")
 
 # 4. Filtro por Tipo de Propiedad (property_type)
 try:
@@ -185,9 +204,11 @@ try:
             df_filtered = df_filtered[df_filtered['property_type'].isin(selected_property_types)]
     else:
         st.sidebar.warning("Columna 'property_type' no disponible o vacía para filtrar.")
+    print("DEBUG: Filtro 'Tipo de Propiedad' procesado.")
 except Exception as e:
     st.sidebar.error(f"Error en el filtro 'Tipo de Propiedad': {e}")
     st.sidebar.exception(e)
+    print(f"ERROR: Filtro 'Tipo de Propiedad' falló: {e}")
 
 # 5. Filtro por Tipo Residencial (residential_type)
 try:
@@ -210,15 +231,19 @@ try:
             st.sidebar.info("Filtro de Tipo Residencial deshabilitado (selecciona 'Residential' en Tipo de Propiedad).")
     else:
         st.sidebar.warning("Columna 'residential_type' no disponible o vacía para filtrar.")
+    print("DEBUG: Filtro 'Tipo Residencial' procesado.")
 except Exception as e:
     st.sidebar.error(f"Error en el filtro 'Tipo Residencial': {e}")
     st.sidebar.exception(e)
+    print(f"ERROR: Filtro 'Tipo Residencial' falló: {e}")
 
 st.sidebar.markdown("---")
 st.sidebar.write(f"**Registros seleccionados:** {df_filtered.shape[0]} de {df_original.shape[0]}")
+print("DEBUG: Barra lateral de filtros completada.")
 
 
 # --- Pestañas de la Aplicación ---
+print("DEBUG: Creando pestañas de la aplicación...")
 tab_eda, tab_clean, tab_feat_eng, tab_outliers, tab_bivariate, tab_modeling = st.tabs([
     "📊 EDA General",
     "🧹 Limpieza Avanzada",
@@ -227,10 +252,12 @@ tab_eda, tab_clean, tab_feat_eng, tab_outliers, tab_bivariate, tab_modeling = st
     "📈 Análisis Bivariado",
     "🤖 Modelado Predictivo"
 ])
+print("DEBUG: Pestañas creadas.")
 
 # --- Contenido de la Pestaña: EDA General ---
 with tab_eda:
     try:
+        print("DEBUG: Iniciando pestaña 'EDA General'...")
         st.header("1. Resumen General del Dataset (Filtros Aplicados)")
         if df_filtered.empty:
             st.warning("El DataFrame filtrado está vacío. Ajusta tus filtros para ver datos en esta sección.")
@@ -316,13 +343,17 @@ with tab_eda:
                 st.plotly_chart(fig_time_series_filtered, use_container_width=True)
             else:
                 st.warning("No se pudo realizar el análisis temporal sin la columna 'sale_year' en los datos filtrados.")
+        print("DEBUG: Pestaña 'EDA General' completada.")
     except Exception as e:
         st.error(f"Error en la pestaña 'EDA General': {e}")
         st.exception(e)
+        print(f"ERROR: Pestaña 'EDA General' falló: {e}")
+
 
 # --- Contenido de la Pestaña: Limpieza Avanzada ---
 with tab_clean:
     try:
+        print("DEBUG: Iniciando pestaña 'Limpieza Avanzada'...")
         st.header("Limpieza Avanzada de Datos")
         st.markdown("""
             Esta sección muestra estrategias para manejar **valores faltantes (NaNs)**.
@@ -408,13 +439,16 @@ with tab_clean:
             st.dataframe(df_cleaned_temp.isnull().sum()[df_cleaned_temp.isnull().sum() > 0].sort_values(ascending=False))
             if df_cleaned_temp.isnull().sum().sum() == 0:
                 st.success("¡DataFrame temporal sin valores faltantes!")
+        print("DEBUG: Pestaña 'Limpieza Avanzada' completada.")
     except Exception as e:
         st.error(f"Error en la pestaña 'Limpieza Avanzada': {e}")
         st.exception(e)
+        print(f"ERROR: Pestaña 'Limpieza Avanzada' falló: {e}")
 
 # --- Contenido de la Pestaña: Ingeniería de Características ---
 with tab_feat_eng:
     try:
+        print("DEBUG: Iniciando pestaña 'Ingeniería de Características'...")
         st.header("Ingeniería de Características")
         st.markdown("""
             En esta sección, creamos nuevas características a partir de las existentes para potenciar el análisis y el modelado.
@@ -468,13 +502,16 @@ with tab_feat_eng:
             st.subheader("DataFrame después de la Ingeniería de Características (Primeras Filas)")
             st.dataframe(df_fe.head())
             st.info("Este DataFrame `df_fe` se pasaría al paso de Detección de Outliers y Modelado.")
+        print("DEBUG: Pestaña 'Ingeniería de Características' completada.")
     except Exception as e:
         st.error(f"Error en la pestaña 'Ingeniería de Características': {e}")
         st.exception(e)
+        print(f"ERROR: Pestaña 'Ingeniería de Características' falló: {e}")
 
 # --- Contenido de la Pestaña: Detección de Outliers ---
 with tab_outliers:
     try:
+        print("DEBUG: Iniciando pestaña 'Detección de Outliers'...")
         st.header("Detección de Outliers")
         st.markdown("""
             Identificamos valores atípicos en las columnas numéricas clave, que podrían influir en el modelado.
@@ -543,13 +580,16 @@ with tab_outliers:
                 st.warning("Columna 'assessed_value' no disponible para detección de outliers.")
 
             st.info("La eliminación de outliers debe hacerse con precaución, ya que puede eliminar información valiosa. A menudo es mejor probar modelos con y sin ellos.")
+        print("DEBUG: Pestaña 'Detección de Outliers' completada.")
     except Exception as e:
         st.error(f"Error en la pestaña 'Detección de Outliers': {e}")
         st.exception(e)
+        print(f"ERROR: Pestaña 'Detección de Outliers' falló: {e}")
 
 # --- Contenido de la Pestaña: Análisis Bivariado/Multivariado ---
 with tab_bivariate:
     try:
+        print("DEBUG: Iniciando pestaña 'Análisis Bivariado y Multivariado'...")
         st.header("Análisis Bivariado y Multivariado")
         st.markdown("""
             Explora las relaciones entre dos o más variables usando gráficos avanzados.
@@ -605,13 +645,16 @@ with tab_bivariate:
                 st.info("Muestra la fuerza y dirección de la relación lineal entre pares de variables numéricas.")
             else:
                 st.info("No hay suficientes columnas numéricas para generar un mapa de calor de correlación en los datos filtrados.")
+        print("DEBUG: Pestaña 'Análisis Bivariado y Multivariado' completada.")
     except Exception as e:
         st.error(f"Error en la pestaña 'Análisis Bivariado y Multivariado': {e}")
         st.exception(e)
+        print(f"ERROR: Pestaña 'Análisis Bivariado y Multivariado' falló: {e}")
 
 # --- Contenido de la Pestaña: Modelado Predictivo ---
 with tab_modeling:
     try:
+        print("DEBUG: Iniciando pestaña 'Modelado Predictivo'...")
         st.header("Modelado Predictivo (Esbozo)")
         st.markdown("""
             Esta sección demuestra un flujo de trabajo básico para construir un modelo
@@ -779,3 +822,4 @@ with tab_modeling:
     except Exception as e:
         st.error(f"Error en la pestaña 'Modelado Predictivo': {e}")
         st.exception(e)
+        print(f"ERROR: Pestaña 'Modelado Predictivo' falló: {e}")
