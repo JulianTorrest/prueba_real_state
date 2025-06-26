@@ -33,7 +33,8 @@ def load_and_preprocess_data(url):
     Carga el archivo CSV y realiza un preprocesamiento inicial.
     """
     try:
-        df = pd.read_csv(url)
+        #df = pd.read_csv(url)
+        df = pd.read_csv(url, low_memory=False)
 
         # Renombrar columnas para facilitar el uso
         df.columns = df.columns.str.strip().str.replace(' ', '_').str.replace('_-', '_').str.replace('.', '', regex=False).str.lower()
