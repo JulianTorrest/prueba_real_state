@@ -1,3 +1,5 @@
+print("DEBUG: Script started.") # Added for very early debugging
+
 import pandas as pd
 import streamlit as st
 import plotly.express as px
@@ -11,7 +13,7 @@ from sklearn.preprocessing import StandardScaler
 # --- Configuración de la aplicación Streamlit ---
 st.set_page_config(
     page_title="Análisis Completo de Ventas Inmobiliarias",
-    page_icon="�",
+    page_icon="🏠",
     layout="wide" # Usa todo el ancho de la pantalla
 )
 
@@ -30,75 +32,58 @@ CSV_URL = "https://media.githubusercontent.com/media/JulianTorrest/prueba_real_s
 @st.cache_data(show_spinner="Cargando y preprocesando datos...")
 def load_and_preprocess_data(url):
     """
-    Carga el archivo CSV y realiza un preprocesamiento inicial.
-    Se han especificado los tipos de datos para evitar la advertencia de 'DtypeWarning'
-    y asegurar la correcta interpretación de las columnas.
+    Carga el archivo CSV en su forma más básica para depuración inicial.
+    Se han comentado todas las operaciones de preprocesamiento para aislar el problema.
     """
-    print("DEBUG: Iniciando carga y preprocesamiento de datos...")
+    print("DEBUG: Iniciando carga y preprocesamiento de datos (versión simplificada para depuración)...")
     try:
-        # Especificar los tipos de datos directamente para las columnas problemáticas
-        # Esto ayuda a evitar la DtypeWarning y asegura la consistencia de los datos.
-        # Las columnas 8-14 son (0-indexed): 7, 8, 9, 10, 11, 12, 13
-        # Sales Ratio (columna 8) -> float
-        # Property Type (columna 9) -> string
-        # Residential Type (columna 10) -> string
-        # Non Use Code (columna 11) -> string (para manejar NaN y valores mixtos)
-        # Assessor Remarks (columna 12) -> string (para manejar NaN y valores mixtos)
-        # OPM remarks (columna 13) -> string (para manejar NaN y valores mixtos)
-        # Location (columna 14) -> string (para manejar NaN y valores mixtos)
-        df = pd.read_csv(url, dtype={
-            'Sales Ratio': float,
-            'Property Type': str,
-            'Residential Type': str,
-            'Non Use Code': str,
-            'Assessor Remarks': str,
-            'OPM remarks': str,
-            'Location': str
-        }, low_memory=False) # low_memory=False se usa como un fallback adicional, aunque dtypes es más específico
+        # Carga el CSV directamente, sin especificar dtypes para esta prueba inicial
+        # Mantener low_memory=False para archivos grandes, pero el enfoque es la simplicidad
+        df = pd.read_csv(url, low_memory=False)
         print(f"DEBUG: CSV cargado exitosamente. Filas: {df.shape[0]}, Columnas: {df.shape[1]}")
 
+        # --- TODAS LAS OPERACIONES DE PREPROCESAMIENTO ORIGINALES HAN SIDO COMENTADAS TEMPORALMENTE ---
         # Renombrar columnas para facilitar el uso
-        original_cols = df.columns.tolist()
-        df.columns = df.columns.str.strip().str.replace(' ', '_').str.replace('_-', '_').str.replace('.', '', regex=False).str.lower()
-        print("DEBUG: Columnas renombradas a minúsculas y con guiones bajos.")
+        # original_cols = df.columns.tolist()
+        # df.columns = df.columns.str.strip().str.replace(' ', '_').str.replace('_-', '_').str.replace('.', '', regex=False).str.lower()
+        # print("DEBUG: Columnas renombradas a minúsculas y con guiones bajos.")
         
         # Opcional: Verificar que las columnas importantes se hayan renombrado correctamente
-        expected_renamed_cols = ['sales_ratio', 'property_type', 'residential_type', 'non_use_code', 'assessor_remarks', 'opm_remarks', 'location']
-        for o_col, n_col in zip(original_cols, df.columns):
-            if o_col in ['Sales Ratio', 'Property Type', 'Residential Type', 'Non Use Code', 'Assessor Remarks', 'OPM remarks', 'Location']:
-                print(f"DEBUG: Columna '{o_col}' renombrada a '{n_col}'.")
+        # expected_renamed_cols = ['sales_ratio', 'property_type', 'residential_type', 'non_use_code', 'assessor_remarks', 'opm_remarks', 'location']
+        # for o_col, n_col in zip(original_cols, df.columns):
+        #     if o_col in ['Sales Ratio', 'Property Type', 'Residential Type', 'Non Use Code', 'Assessor Remarks', 'OPM remarks', 'Location']:
+        #         print(f"DEBUG: Columna '{o_col}' renombrada a '{n_col}'.")
 
 
         # Conversión de tipos de datos
-        # pd.to_numeric con errors='coerce' maneja cualquier valor no numérico a NaN
-        df['assessed_value'] = pd.to_numeric(df['assessed_value'], errors='coerce')
-        df['sale_amount'] = pd.to_numeric(df['sale_amount'], errors='coerce')
-        df['sales_ratio'] = pd.to_numeric(df['sales_ratio'], errors='coerce')
-        print("DEBUG: Columnas numéricas convertidas.")
+        # df['assessed_value'] = pd.to_numeric(df['assessed_value'], errors='coerce')
+        # df['sale_amount'] = pd.to_numeric(df['sale_amount'], errors='coerce')
+        # df['sales_ratio'] = pd.to_numeric(df['sales_ratio'], errors='coerce')
+        # print("DEBUG: Columnas numéricas convertidas.")
 
         # Convert date_recorded to datetime, handle errors, and remove timezone
-        df['date_recorded'] = pd.to_datetime(df['date_recorded'], errors='coerce')
-        if pd.api.types.is_datetime64_any_dtype(df['date_recorded']):
-            df['date_recorded'] = df['date_recorded'].dt.tz_localize(None)
-        print("DEBUG: 'date_recorded' procesada.")
+        # df['date_recorded'] = pd.to_datetime(df['date_recorded'], errors='coerce')
+        # if pd.api.types.is_datetime64_any_dtype(df['date_recorded']):
+        #     df['date_recorded'] = df['date_recorded'].dt.tz_localize(None)
+        # print("DEBUG: 'date_recorded' procesada.")
 
         # Extraer año y mes de la fecha
-        df['sale_year'] = df['date_recorded'].dt.year.astype('Int64') # Int64 para manejar NaNs en enteros
-        df['sale_month'] = df['date_recorded'].dt.month_name()
-        print("DEBUG: 'sale_year' y 'sale_month' extraídas.")
+        # df['sale_year'] = df['date_recorded'].dt.year.astype('Int64') # Int64 para manejar NaNs en enteros
+        # df['sale_month'] = df['date_recorded'].dt.month_name()
+        # print("DEBUG: 'sale_year' y 'sale_month' extraídas.")
         
-        df['sale_month'] = df['sale_month'].astype(str).replace('NaT', np.nan).fillna('Unknown')
+        # df['sale_month'] = df['sale_month'].astype(str).replace('NaT', np.nan).fillna('Unknown')
 
-        df['date_recorded'] = df['date_recorded'].dt.strftime('%Y-%m-%d %H:%M:%S').fillna('')
+        # df['date_recorded'] = df['date_recorded'].dt.strftime('%Y-%m-%d %H:%M:%S').fillna('')
 
         # Limpiar columnas categóricas para filtros y análisis
-        for col in ['town', 'property_type', 'residential_type', 'non_use_code', 'assessor_remarks', 'opm_remarks', 'location']:
-            if col in df.columns:
-                df[col] = df[col].astype(str).str.strip().replace('nan', np.nan)
-                df[col] = df[col].fillna('Unknown')
-                print(f"DEBUG: Columna categórica '{col}' limpiada y NaNs rellenados.")
+        # for col in ['town', 'property_type', 'residential_type', 'non_use_code', 'assessor_remarks', 'opm_remarks', 'location']:
+        #     if col in df.columns:
+        #         df[col] = df[col].astype(str).str.strip().replace('nan', np.nan)
+        #         df[col] = df[col].fillna('Unknown')
+        #         print(f"DEBUG: Columna categórica '{col}' limpiada y NaNs rellenados.")
 
-        print("DEBUG: Preprocesamiento de datos completado.")
+        print("DEBUG: Preprocesamiento de datos (simplificado) completado.")
         return df
     except Exception as e:
         print(f"ERROR: Fallo en load_and_preprocess_data: {e}")
@@ -612,7 +597,7 @@ with tab_bivariate:
                 st.warning("Columnas 'assessed_value', 'sale_amount' o 'property_type' no disponibles para este gráfico.")
 
             st.subheader("2. Distribución de Precio de Venta por Mes")
-            if 'sale_month' in df_filtered.columns and 'sale_amount' in df_filtered.columns:
+            if 'sale_month' in df_filtered.columns and not df_filtered['sale_month'].isnull().all():
                 month_order = ["January", "February", "March", "April", "May", "June",
                                 "July", "August", "September", "October", "November", "December", "Unknown"]
                 df_plot = df_filtered.copy()
