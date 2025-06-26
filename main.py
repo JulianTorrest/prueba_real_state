@@ -31,21 +31,20 @@ st.markdown("---")
 PARQUET_URL = "https://media.githubusercontent.com/media/JulianTorrest/prueba_real_state/main/data/Real_Estate_Sales_2001-2022_GL.parquet"
 
 # --- Sidebar para el número de filas a cargar ---
+# NOTA: El argumento 'nrows' no es compatible con pd.read_parquet.
+# Si el archivo Parquet completo es demasiado grande y causa errores de memoria,
+# deberás cargar un subconjunto del archivo Parquet o usar una fuente de datos diferente.
 st.sidebar.header("Opciones de Carga de Datos")
-load_nrows = st.sidebar.number_input(
-    "Número de filas a cargar del archivo Parquet (0 para todas):",
-    min_value=0,
-    # El valor máximo se ajusta, pero para 25MB, incluso 500k-1M filas pueden ser mucho
-    # Se recomienda empezar con un número bajo como 100000 o incluso 50000 para probar.
-    max_value=5000000, # Un valor alto para datasets muy grandes, ajústalo si hay problemas
-    value=100000, # Valor por defecto recomendado para evitar OOM inicial
-    step=10000,
-    help="Cargar menos filas puede prevenir errores de memoria en entornos de despliegue con recursos limitados."
+st.sidebar.info(
+    "La carga de archivos Parquet es más eficiente, pero si el conjunto de datos completo es muy grande (>25MB), "
+    "aún puede causar problemas de memoria en Streamlit Cloud. Considera usar un subconjunto pre-filtrado "
+    "o una base de datos externa para datos masivos."
 )
+# Eliminado el number_input para nrows, ya que no aplica directamente a pd.read_parquet
 st.sidebar.markdown("---")
 
 @st.cache_data(show_spinner="Cargando y preprocesando datos...")
-def load_and_preprocess_data(url, nrows=None):
+def load_and_preprocess_data(url): # Eliminado nrows de los argumentos
     """
     Carga el archivo Parquet y realiza el preprocesamiento necesario.
     Al usar Parquet, no es necesario especificar 'dtype' ni 'low_memory' como en CSV,
@@ -54,8 +53,8 @@ def load_and_preprocess_data(url, nrows=None):
     print("DEBUG: [load_and_preprocess_data] Iniciando carga y preprocesamiento de datos desde Parquet...")
     df = pd.DataFrame() # Initialize df to ensure it exists even if read_parquet fails
     try:
-        print(f"DEBUG: [load_and_preprocess_data] Intentando leer archivo Parquet desde: {url}. Filas a cargar: {nrows if nrows else 'Todas'}")
-        df = pd.read_parquet(url, nrows=nrows) # Pasa el parámetro nrows a read_parquet
+        print(f"DEBUG: [load_and_preprocess_data] Intentando leer archivo Parquet desde: {url}. Cargando todas las filas.")
+        df = pd.read_parquet(url) # Eliminado nrows=nrows
         print(f"DEBUG: [load_and_preprocess_data] Archivo Parquet cargado exitosamente. Filas: {df.shape[0]}, Columnas: {df.shape[1]}")
 
         print("DEBUG: [load_and_preprocess_data] Renombrando columnas...")
@@ -100,9 +99,9 @@ def load_and_preprocess_data(url, nrows=None):
         st.exception(e)
         return pd.DataFrame()
 
-# --- Cargar los Datos Originales (ahora desde Parquet con opción de nrows) ---
-print(f"DEBUG: Llamando a load_and_preprocess_data con URL de Parquet: {PARQUET_URL} y nrows={load_nrows}...")
-df_original = load_and_preprocess_data(PARQUET_URL, nrows=load_nrows if load_nrows > 0 else None)
+# --- Cargar los Datos Originales (ahora desde Parquet sin el control de nrows) ---
+print(f"DEBUG: Llamando a load_and_preprocess_data con URL de Parquet: {PARQUET_URL}...")
+df_original = load_and_preprocess_data(PARQUET_URL) # Eliminado nrows=load_nrows
 print(f"DEBUG: df_original cargado. Vacío: {df_original.empty}")
 
 if df_original.empty:
@@ -453,7 +452,7 @@ with tab_feat_eng:
                 st.dataframe(df_fe[['town', 'property_type', 'town_prop_type']].head())
                 st.info(f"Número de categorías únicas para `town_prop_type`: {df_fe['town_prop_type'].nunique()}")
             else:
-                st.warning("Columnas 'town' o 'property_type' no disponibles para crear `town_prop_type`.")
+                st.warning("Columna 'town' o 'property_type' no disponibles para crear `town_prop_type`.")
 
             st.subheader("2. Categorías de Precio de Venta")
             if 'sale_amount' in df_fe.columns and not df_fe['sale_amount'].isnull().all():
@@ -625,7 +624,6 @@ with tab_bivariate:
                                               color_continuous_scale='RdBu_r',
                                               title='Matriz de Correlación Numérica (Filtrada)')
                 st.plotly_chart(fig_corr_heatmap, use_container_width=True)
-                st.info("Muestra la fuerza y dirección de la relación lineal entre pares de variables numéricas.")
             else:
                 st.info("No hay suficientes columnas numéricas para generar un mapa de calor de correlación en los datos filtrados.")
         print("DEBUG: Pestaña 'Análisis Bivariado y Multivariado' completada.")
