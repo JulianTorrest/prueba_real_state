@@ -276,7 +276,8 @@ with tab_eda:
 
             st.header("2. Manejo de Valores Faltantes (NaNs) (Filtros Aplicados)")
             missing_data_filtered = df_filtered.isnull().sum()
-            missing_data_filtered = missing_filtered[missing_data_filtered > 0].sort_values(ascending=False)
+            # CORRECCIÓN: 'missing_filtered' debe ser 'missing_data_filtered'
+            missing_data_filtered = missing_data_filtered[missing_data_filtered > 0].sort_values(ascending=False)
             missing_percentage_filtered = (df_filtered.isnull().sum() / len(df_filtered)) * 100
             missing_info_filtered = pd.DataFrame({
                 'Total Faltantes': missing_data_filtered,
