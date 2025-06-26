@@ -36,10 +36,11 @@ def load_and_preprocess_data(url):
     Se han especificado los tipos de datos para evitar la advertencia de 'DtypeWarning'
     y asegurar la correcta interpretación de las columnas.
     """
-    print("DEBUG: Iniciando carga y preprocesamiento de datos...")
+    print("DEBUG: [load_and_preprocess_data] Iniciando carga y preprocesamiento de datos...")
+    df = pd.DataFrame() # Initialize df to ensure it exists even if read_csv fails
     try:
+        print("DEBUG: [load_and_preprocess_data] Intentando leer CSV...")
         # Especificar los tipos de datos directamente para las columnas problemáticas
-        # Esto ayuda a evitar la DtypeWarning y asegura la consistencia de los datos.
         # Las columnas se refieren a los nombres ORIGINALES del CSV.
         df = pd.read_csv(url, dtype={
             'Sales Ratio': float,
@@ -49,55 +50,49 @@ def load_and_preprocess_data(url):
             'Assessor Remarks': str,
             'OPM remarks': str,
             'Location': str
-        }, low_memory=False) # low_memory=False se usa como un fallback adicional, aunque dtypes es más específico
-        print(f"DEBUG: CSV cargado exitosamente. Filas: {df.shape[0]}, Columnas: {df.shape[1]}")
+        }, low_memory=False)
+        print(f"DEBUG: [load_and_preprocess_data] CSV cargado exitosamente. Filas: {df.shape[0]}, Columnas: {df.shape[1]}")
 
-        # Renombrar columnas para facilitar el uso
-        # Esto DEBE ocurrir ANTES de acceder a las columnas con los nombres nuevos
+        print("DEBUG: [load_and_preprocess_data] Renombrando columnas...")
         df.columns = df.columns.str.strip().str.replace(' ', '_').str.replace('_-', '_').str.replace('.', '', regex=False).str.lower()
-        print("DEBUG: Columnas renombradas a minúsculas y con guiones bajos.")
+        print("DEBUG: [load_and_preprocess_data] Columnas renombradas a minúsculas y con guiones bajos.")
         
-        # Conversión de tipos de datos
-        # pd.to_numeric con errors='coerce' maneja cualquier valor no numérico a NaN
-        # Estas conversiones son importantes incluso si se especifican dtypes,
-        # para manejar valores problemáticos (ej. cadenas vacías en columnas numéricas)
+        print("DEBUG: [load_and_preprocess_data] Convirtiendo columnas numéricas...")
         df['assessed_value'] = pd.to_numeric(df['assessed_value'], errors='coerce')
         df['sale_amount'] = pd.to_numeric(df['sale_amount'], errors='coerce')
-        # 'sales_ratio' ya se definió como float en dtype, pero lo volvemos a asegurar por si acaso
         df['sales_ratio'] = pd.to_numeric(df['sales_ratio'], errors='coerce')
-        print("DEBUG: Columnas numéricas convertidas.")
+        print("DEBUG: [load_and_preprocess_data] Columnas numéricas convertidas.")
 
-        # Convert date_recorded to datetime, handle errors, and remove timezone
+        print("DEBUG: [load_and_preprocess_data] Procesando 'date_recorded'...")
         df['date_recorded'] = pd.to_datetime(df['date_recorded'], errors='coerce')
         if pd.api.types.is_datetime64_any_dtype(df['date_recorded']):
             df['date_recorded'] = df['date_recorded'].dt.tz_localize(None)
-        print("DEBUG: 'date_recorded' procesada.")
+        print("DEBUG: [load_and_preprocess_data] 'date_recorded' procesada.")
 
-        # Extraer año y mes de la fecha
-        # ESTAS LÍNEAS SON CRÍTICAS para 'sale_year' y 'sale_month'
-        df['sale_year'] = df['date_recorded'].dt.year.astype('Int64') # Int64 para manejar NaNs en enteros
+        print("DEBUG: [load_and_preprocess_data] Extrayendo 'sale_year' y 'sale_month'...")
+        df['sale_year'] = df['date_recorded'].dt.year.astype('Int64')
         df['sale_month'] = df['date_recorded'].dt.month_name()
-        print("DEBUG: 'sale_year' y 'sale_month' extraídas.")
+        print("DEBUG: [load_and_preprocess_data] 'sale_year' y 'sale_month' extraídas.")
         
+        print("DEBUG: [load_and_preprocess_data] Limpiando 'sale_month' y formato 'date_recorded'...")
         df['sale_month'] = df['sale_month'].astype(str).replace('NaT', np.nan).fillna('Unknown')
         df['date_recorded'] = df['date_recorded'].dt.strftime('%Y-%m-%d %H:%M:%S').fillna('')
+        print("DEBUG: [load_and_preprocess_data] 'sale_month' y 'date_recorded' limpiadas.")
 
-        # Limpiar columnas categóricas para filtros y análisis
-        # También las nuevas columnas que se especificaron como 'str' en dtype
+        print("DEBUG: [load_and_preprocess_data] Limpiando columnas categóricas...")
         for col in ['town', 'property_type', 'residential_type', 'non_use_code', 'assessor_remarks', 'opm_remarks', 'location']:
-            if col in df.columns: # Verificar si la columna existe después de renombrar
-                # Asegurar que sean strings y manejar 'nan' literal a np.nan, luego rellenar con 'Unknown'
+            if col in df.columns:
                 df[col] = df[col].astype(str).str.strip().replace('nan', np.nan)
                 df[col] = df[col].fillna('Unknown')
-                print(f"DEBUG: Columna categórica '{col}' limpiada y NaNs rellenados.")
+                print(f"DEBUG: [load_and_preprocess_data] Columna categórica '{col}' limpiada y NaNs rellenados.")
 
-        print("DEBUG: Preprocesamiento de datos completado.")
+        print("DEBUG: [load_and_preprocess_data] Preprocesamiento de datos completado.")
         return df
     except Exception as e:
-        print(f"ERROR: Fallo en load_and_preprocess_data: {e}")
+        print(f"ERROR: [load_and_preprocess_data] Fallo en el preprocesamiento de datos: {e}")
         st.error(f"Error al intentar cargar o preprocesar el archivo CSV: {e}")
         st.info("Asegúrate de que la URL sea correcta y que el archivo sea un CSV válido.")
-        st.exception(e) # Muestra el traceback completo en la aplicación
+        st.exception(e)
         return pd.DataFrame()
 
 # --- Cargar los Datos Originales ---
@@ -107,7 +102,7 @@ print(f"DEBUG: df_original cargado. Vacío: {df_original.empty}")
 
 if df_original.empty:
     st.warning("No se pudieron cargar los datos o el DataFrame está vacío. No se puede continuar con el análisis.")
-    st.stop() # Detiene la ejecución si no hay datos
+    st.stop()
 
 print("DEBUG: Iniciando sección de filtros de la barra lateral...")
 # --- Sidebar para Filtros (aplicados a todas las pestañas) ---
@@ -145,7 +140,7 @@ try:
     if 'sale_month' in df_filtered.columns and not df_filtered['sale_month'].isnull().all():
         all_months = df_filtered['sale_month'].dropna().unique().tolist()
         month_order = ["January", "February", "March", "April", "May", "June",
-                        "July", "August", "September", "October", "November", "December", "Unknown"] # Include 'Unknown'
+                        "July", "August", "September", "October", "November", "December", "Unknown"]
         all_months_sorted = [m for m in month_order if m in all_months]
 
         selected_months = st.sidebar.multiselect(
@@ -171,7 +166,7 @@ try:
         selected_towns = st.sidebar.multiselect(
             "Selecciona Ciudades:",
             options=all_towns,
-            default=[] # Por defecto, ninguna ciudad seleccionada para explorar
+            default=[]
         )
         if selected_towns:
             df_filtered = df_filtered[df_filtered['town'].isin(selected_towns)]
@@ -206,17 +201,15 @@ except Exception as e:
 # 5. Filtro por Tipo Residencial (residential_type)
 try:
     if 'residential_type' in df_filtered.columns and not df_filtered['residential_type'].isnull().all():
-        # Only show residential types if 'Residential' is selected AND there are actual residential properties
         if 'Residential' in selected_property_types and any(df_filtered['property_type'] == 'Residential'):
             all_residential_types = df_filtered['residential_type'].dropna().unique().tolist()
-            # Filter out 'Unknown' if it's the only type left due to filtering
             if 'Unknown' in all_residential_types and len(all_residential_types) > 1:
-                all_residential_types.remove('Unknown') # Remove 'Unknown' for better default selection
+                all_residential_types.remove('Unknown')
             all_residential_types.sort()
             selected_residential_types = st.sidebar.multiselect(
                 "Selecciona Tipo Residencial:",
                 options=all_residential_types,
-                default=all_residential_types # Select all available non-Unknown by default
+                default=all_residential_types
             )
             if selected_residential_types:
                 df_filtered = df_filtered[df_filtered['residential_type'].isin(selected_residential_types)]
@@ -271,13 +264,11 @@ with tab_eda:
             st.dataframe(df_filtered.dtypes.astype(str).reset_index().rename(columns={0: 'Tipo de Dato', 'index': 'Columna'}))
 
             st.subheader("Estadísticas Descriptivas de Columnas Numéricas")
-            # Ensure only numeric columns are described, avoiding any potential timestamp issues
             st.dataframe(df_filtered.select_dtypes(include=np.number).describe().T)
 
             st.header("2. Manejo de Valores Faltantes (NaNs) (Filtros Aplicados)")
             missing_data_filtered = df_filtered.isnull().sum()
-            # CORRECCIÓN: 'missing_filtered' debe ser 'missing_data_filtered'
-            missing_data_filtered = missing_data_filtered[missing_data_filtered > 0].sort_values(ascending=False)
+            missing_data_filtered = missing_data_filtered[missing_data_filtered > 0].sort_values(ascending=False) # Corrected variable name
             missing_percentage_filtered = (df_filtered.isnull().sum() / len(df_filtered)) * 100
             missing_info_filtered = pd.DataFrame({
                 'Total Faltantes': missing_data_filtered,
@@ -292,7 +283,6 @@ with tab_eda:
 
             st.header("3. Visualizaciones Clave (Filtros Aplicados)")
 
-            # Venta por Ciudad (Town)
             st.subheader("Ventas por Ciudad (Top 20 Filtradas)")
             if 'town' in df_filtered.columns and not df_filtered['town'].isnull().all():
                 top_towns_filtered = df_filtered['town'].value_counts().nlargest(20).reset_index()
@@ -304,7 +294,6 @@ with tab_eda:
             else:
                 st.info("Columna 'town' no disponible o insuficiente para este gráfico en los datos filtrados.")
 
-            # Tipo de Propiedad
             st.subheader("Ventas por Tipo de Propiedad (Filtradas)")
             if 'property_type' in df_filtered.columns and not df_filtered['property_type'].isnull().all():
                 prop_type_counts_filtered = df_filtered['property_type'].value_counts().reset_index()
@@ -316,7 +305,6 @@ with tab_eda:
             else:
                 st.info("Columna 'property_type' no disponible o insuficiente para este gráfico en los datos filtrados.")
 
-            # Histograma de Sale Amount
             st.subheader("Distribución de 'Sale Amount' (Precio de Venta) (Filtrada)")
             if 'sale_amount' in df_filtered.columns and not df_filtered['sale_amount'].isnull().all():
                 fig_sale_amount_filtered = px.histogram(df_filtered, x='sale_amount', nbins=50,
@@ -327,7 +315,6 @@ with tab_eda:
             else:
                 st.info("Columna 'sale_amount' no disponible o insuficiente para este gráfico en los datos filtrados.")
 
-            # Ventas Anuales a lo Largo del Tiempo
             st.subheader("Ventas Anuales a lo Largo del Tiempo (Filtradas)")
             if 'sale_year' in df_filtered.columns and not df_filtered['sale_year'].isnull().all():
                 sales_over_time_filtered = df_filtered.groupby('sale_year').size().reset_index(name='Número de Ventas')
@@ -374,7 +361,7 @@ with tab_clean:
             st.markdown("---")
             st.subheader("Estrategias de Imputación/Eliminación (Demostración)")
 
-            df_cleaned_temp = df_filtered.copy() # Copia temporal para demostración de limpieza
+            df_cleaned_temp = df_filtered.copy()
 
             st.write("#### 1. Columnas con alta proporción de NaNs (Ejemplo: `non_use_code`, `assessor_remarks`, `opm_remarks`, `location`)")
             cols_to_drop = ['non_use_code', 'assessor_remarks', 'opm_remarks', 'location']
@@ -382,7 +369,7 @@ with tab_clean:
             if cols_to_drop_existing:
                 st.write(f"Columnas candidatas a eliminación por muchos NaNs o irrelevancia: `{', '.join(cols_to_drop_existing)}`")
                 if st.checkbox("Eliminar estas columnas para la demostración?", key="clean_drop_cols"):
-                    df_cleaned_temp = df_cleaned_temp.drop(columns=cols_to_drop_existing) # Removed inplace
+                    df_cleaned_temp = df_cleaned_temp.drop(columns=cols_to_drop_existing)
                     st.success(f"Columnas eliminadas. DataFrame ahora tiene {df_cleaned_temp.shape[1]} columnas.")
             else:
                 st.info("Las columnas de ejemplo para eliminación no están presentes o ya fueron manejadas.")
@@ -397,11 +384,11 @@ with tab_clean:
                         key="impute_residential_type"
                     )
                     if imputation_option == "Imputar con 'Unknown'":
-                        df_cleaned_temp['residential_type'] = df_cleaned_temp['residential_type'].fillna('Unknown') # Removed inplace
+                        df_cleaned_temp['residential_type'] = df_cleaned_temp['residential_type'].fillna('Unknown')
                         st.success("Valores faltantes en 'residential_type' imputados con 'Unknown'.")
                     elif imputation_option == "Imputar con la Moda":
                         mode_val = df_cleaned_temp['residential_type'].mode()[0]
-                        df_cleaned_temp['residential_type'] = df_cleaned_temp['residential_type'].fillna(mode_val) # Removed inplace
+                        df_cleaned_temp['residential_type'] = df_cleaned_temp['residential_type'].fillna(mode_val)
                         st.success(f"Valores faltantes en 'residential_type' imputados con la moda: '{mode_val}'.")
                     st.write(f"Valores únicos después de imputación: {df_cleaned_temp['residential_type'].unique()}")
                 else:
@@ -419,12 +406,12 @@ with tab_clean:
                     key="impute_numeric_method"
                 )
                 if imputation_method != "No imputar":
-                    for col in numeric_cols_with_nan:
+                    for col in numeric_cols_nan:
                         if imputation_method == "Mediana":
                             val = df_cleaned_temp[col].median()
-                        else: # Media
+                        else:
                             val = df_cleaned_temp[col].mean()
-                        df_cleaned_temp[col] = df_cleaned_temp[col].fillna(val) # Removed inplace
+                        df_cleaned_temp[col] = df_cleaned_temp[col].fillna(val)
                         st.success(f"Valores faltantes en '{col}' imputados con la {imputation_method.lower()}: {val:,.2f}.")
             else:
                 st.info("No hay columnas numéricas con valores faltantes en el DataFrame actual.")
@@ -452,7 +439,7 @@ with tab_feat_eng:
         if df_filtered.empty:
             st.warning("El DataFrame filtrado está vacío. Ajusta tus filtros para ver datos en esta sección.")
         else:
-            df_fe = df_filtered.copy() # DataFrame para feature engineering
+            df_fe = df_filtered.copy()
 
             st.subheader("1. Característica Combinada: Ciudad y Tipo de Propiedad")
             if 'town' in df_fe.columns and 'property_type' in df_fe.columns:
@@ -467,18 +454,16 @@ with tab_feat_eng:
             if 'sale_amount' in df_fe.columns and not df_fe['sale_amount'].isnull().all():
                 bins = [0, 100000, 300000, 700000, np.inf]
                 labels = ['0-100K', '100K-300K', '300K-700K', '700K+']
-                # Ensure sale_amount_category has categories if it was potentially empty before
                 df_fe['sale_amount_category'] = pd.cut(df_fe['sale_amount'], bins=bins, labels=labels, right=False)
                 st.write("Se ha creado la característica `sale_amount_category`.")
                 st.dataframe(df_fe[['sale_amount', 'sale_amount_category']].head())
 
                 st.subheader("Distribución de `sale_amount_category`")
                 price_category_counts = df_fe['sale_amount_category'].value_counts().reset_index()
-                # FIX: Rename the columns of price_category_counts for Plotly Express
-                price_category_counts.columns = ['Sale_Amount_Category', 'Count'] # Renamed 'index' to 'Sale_Amount_Category'
+                price_category_counts.columns = ['Sale_Amount_Category', 'Count']
 
                 fig_price_cat = px.bar(price_category_counts,
-                                       x='Sale_Amount_Category', y='Count', # Use the new column name here
+                                       x='Sale_Amount_Category', y='Count',
                                        title='Distribución por Categoría de Precio de Venta')
 
                 st.plotly_chart(fig_price_cat, use_container_width=True)
@@ -515,7 +500,7 @@ with tab_outliers:
         if df_filtered.empty:
             st.warning("El DataFrame filtrado está vacío. Ajusta tus filtros para ver datos en esta sección.")
         else:
-            df_outlier = df_filtered.copy() # DataFrame para detección de outliers
+            df_outlier = df_filtered.copy()
 
             st.subheader("1. Detección de Outliers en 'Sale Amount' (Precio de Venta)")
             if 'sale_amount' in df_outlier.columns and not df_outlier['sale_amount'].isnull().all():
@@ -610,7 +595,6 @@ with tab_bivariate:
                 month_order = ["January", "February", "March", "April", "May", "June",
                                 "July", "August", "September", "October", "November", "December", "Unknown"]
                 df_plot = df_filtered.copy()
-                # Ensure 'Unknown' is in categories if present
                 current_months = df_plot['sale_month'].dropna().unique().tolist()
                 final_month_order = [m for m in month_order if m in current_months]
 
@@ -663,42 +647,24 @@ with tab_modeling:
             st.subheader("Preparación de Datos para el Modelado")
             st.info("Se creará un subconjunto de datos para el modelado, aplicando one-hot encoding y escalado.")
 
-            # Realiza una copia del DataFrame filtrado para no afectar otras pestañas
             df_model = df_filtered.copy()
 
-            # Seleccionar características y la variable objetivo
-            # Incluir columnas que tienen sentido para predecir 'sale_amount'
-            # Excluir 'date_recorded' y 'address' (que son identificadores o no útiles directamente)
-            # Asegurarse de que 'sale_year' esté incluido, ya que es numérico y relevante.
-            # Excluir 'sales_ratio' ya que es una relación entre 'sale_amount' y 'assessed_value'
-            # y su inclusión podría generar fuga de información o multicolinealidad.
-
-            # Columnas numéricas que se usarán como características
-            # 'list_year' puede estar ausente si el dataset no lo tiene
             numerical_features = ['assessed_value', 'list_year']
-            # Asegurarse de que 'list_year' exista y sea numérico, si no, quitarlo de las características
             if 'list_year' not in df_model.columns:
                 st.warning("La columna 'list_year' no está presente y no se incluirá como característica numérica.")
                 numerical_features.remove('list_year')
             else:
-                # Asegurarse de que 'list_year' sea numérico y manejar NaNs
                 df_model['list_year'] = pd.to_numeric(df_model['list_year'], errors='coerce')
-                # Imputar NaNs en 'list_year' con la mediana si es necesario
                 if df_model['list_year'].isnull().any():
                     median_list_year = df_model['list_year'].median()
                     df_model['list_year'].fillna(median_list_year, inplace=True)
                     st.info(f"Valores faltantes en 'list_year' imputados con la mediana: {int(median_list_year)}.")
             
-            # Columnas categóricas que se usarán como características
-            # 'residential_type' ya tiene 'Unknown' manejado en preprocesamiento
             categorical_features = ['town', 'property_type', 'residential_type', 'sale_month']
-            # Filtrar características categóricas que quizás no existan en el dataframe filtrado
             categorical_features = [col for col in categorical_features if col in df_model.columns]
 
             target = 'sale_amount'
 
-            # Limpieza de NaNs para las columnas relevantes antes del modelado
-            # Para RandomForest, es mejor eliminar filas con NaNs en X o y
             features_for_model = numerical_features + categorical_features + [target]
             df_model.dropna(subset=features_for_model, inplace=True)
 
@@ -708,13 +674,9 @@ with tab_modeling:
 
             st.write(f"Filas disponibles para modelado después de limpiar NaNs: {df_model.shape[0]}")
 
-            # One-Hot Encoding para variables categóricas
-            # st.write(f"Aplicando One-Hot Encoding a: {categorical_features}")
             df_model_encoded = pd.get_dummies(df_model, columns=categorical_features, drop_first=True, dtype=int)
             st.write(f"Número de columnas después de One-Hot Encoding: {df_model_encoded.shape[1]}")
 
-            # Separar X y y
-            # Asegurarse de que 'sale_amount' esté en las columnas después de encoding
             if target not in df_model_encoded.columns:
                 st.error(f"La columna objetivo '{target}' no se encontró en el DataFrame después del encoding.")
                 st.stop()
@@ -722,18 +684,15 @@ with tab_modeling:
             X = df_model_encoded.drop(columns=[target])
             y = df_model_encoded[target]
 
-            # Asegurarse de que todas las columnas numéricas estén presentes en X después del one-hot encoding
             final_numerical_features = [col for col in numerical_features if col in X.columns]
             if not final_numerical_features:
                 st.warning("No se encontraron características numéricas válidas para el escalado. Esto podría afectar el rendimiento del modelo.")
 
-            # Escalar características numéricas
             if final_numerical_features:
                 st.write(f"Escalando características numéricas: {final_numerical_features}")
                 scaler = StandardScaler()
                 X[final_numerical_features] = scaler.fit_transform(X[final_numerical_features])
 
-            # Dividir los datos en conjuntos de entrenamiento y prueba
             test_size = st.slider("Tamaño del conjunto de prueba (Test Size):", min_value=0.1, max_value=0.5, value=0.2, step=0.05)
             random_state = st.slider("Semilla aleatoria (Random State):", min_value=0, max_value=100, value=42, step=1)
 
@@ -748,12 +707,10 @@ with tab_modeling:
 
             n_estimators = st.slider("Número de estimadores (árboles):", min_value=50, max_value=500, value=100, step=50)
             max_depth = st.slider("Profundidad máxima de los árboles (0 para ilimitado):", min_value=0, max_value=20, value=10, step=1)
-            # Convert 0 to None for max_depth in RandomForestRegressor
             actual_max_depth = None if max_depth == 0 else max_depth
 
 
             if st.button("Entrenar Modelo"):
-                # Mostrar un spinner mientras el modelo se entrena
                 with st.spinner("Entrenando RandomForestRegressor... Esto puede tomar un momento."):
                     model = RandomForestRegressor(n_estimators=n_estimators, max_depth=actual_max_depth, random_state=random_state, n_jobs=-1)
                     model.fit(X_train, y_train)
@@ -777,9 +734,7 @@ with tab_modeling:
                 """)
 
                 st.subheader("Visualización de Predicciones vs. Valores Reales")
-                # Create a dataframe for plotting actual vs predicted values
                 results_df = pd.DataFrame({'Actual': y_test, 'Predicted': y_pred})
-                # Sample for performance if the test set is too large
                 results_df = results_df.sample(min(1000, len(results_df)), random_state=42)
 
                 fig_pred_vs_actual = px.scatter(results_df, x='Actual', y='Predicted',
@@ -813,6 +768,7 @@ with tab_modeling:
                 """)
             else:
                 st.info("Haz clic en 'Entrenar Modelo' para iniciar el proceso de modelado.")
+        print("DEBUG: Pestaña 'Modelado Predictivo' completada.")
     except Exception as e:
         st.error(f"Error en la pestaña 'Modelado Predictivo': {e}")
         st.exception(e)
