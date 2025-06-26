@@ -1,4 +1,4 @@
-print("DEBUG: Script started.") # Added for very early debugging
+print("DEBUG: Script started.")
 
 import pandas as pd
 import streamlit as st
@@ -14,7 +14,7 @@ from sklearn.preprocessing import StandardScaler
 st.set_page_config(
     page_title="Análisis Completo de Ventas Inmobiliarias",
     page_icon="🏠",
-    layout="wide" # Usa todo el ancho de la pantalla
+    layout="wide"
 )
 
 st.title("🏡 Análisis Completo de Datos de Ventas Inmobiliarias (2001-2022)")
@@ -29,19 +29,30 @@ st.markdown("---")
 # --- Define la URL de tu archivo CSV en GitHub ---
 CSV_URL = "https://media.githubusercontent.com/media/JulianTorrest/prueba_real_state/main/data/Real_Estate_Sales_2001-2022_GL.csv"
 
+# --- Sidebar para el número de filas a cargar ---
+st.sidebar.header("Opciones de Carga de Datos")
+load_nrows = st.sidebar.number_input(
+    "Número de filas a cargar del CSV (0 para todas):",
+    min_value=0,
+    max_value=1000000, # Aumenta este valor si tu máquina local puede manejar más
+    value=100000, # Valor por defecto para pruebas iniciales en la nube
+    step=10000,
+    help="Cargar menos filas puede prevenir errores de memoria para archivos CSV grandes."
+)
+st.sidebar.markdown("---")
+
+
 @st.cache_data(show_spinner="Cargando y preprocesando datos...")
-def load_and_preprocess_data(url):
+def load_and_preprocess_data(url, nrows=None):
     """
     Carga el archivo CSV y realiza un preprocesamiento inicial.
     Se han especificado los tipos de datos para evitar la advertencia de 'DtypeWarning'
     y asegurar la correcta interpretación de las columnas.
     """
     print("DEBUG: [load_and_preprocess_data] Iniciando carga y preprocesamiento de datos...")
-    df = pd.DataFrame() # Initialize df to ensure it exists even if read_csv fails
+    df = pd.DataFrame()
     try:
-        print("DEBUG: [load_and_preprocess_data] Intentando leer CSV...")
-        # Especificar los tipos de datos directamente para las columnas problemáticas
-        # Las columnas se refieren a los nombres ORIGINALES del CSV.
+        print(f"DEBUG: [load_and_preprocess_data] Intentando leer CSV. Filas a cargar: {nrows if nrows else 'Todas'}")
         df = pd.read_csv(url, dtype={
             'Sales Ratio': float,
             'Property Type': str,
@@ -50,7 +61,7 @@ def load_and_preprocess_data(url):
             'Assessor Remarks': str,
             'OPM remarks': str,
             'Location': str
-        }, low_memory=False)
+        }, low_memory=False, nrows=nrows) # Pass nrows here
         print(f"DEBUG: [load_and_preprocess_data] CSV cargado exitosamente. Filas: {df.shape[0]}, Columnas: {df.shape[1]}")
 
         print("DEBUG: [load_and_preprocess_data] Renombrando columnas...")
@@ -96,12 +107,12 @@ def load_and_preprocess_data(url):
         return pd.DataFrame()
 
 # --- Cargar los Datos Originales ---
-print("DEBUG: Llamando a load_and_preprocess_data...")
-df_original = load_and_preprocess_data(CSV_URL)
+print(f"DEBUG: Llamando a load_and_preprocess_data con nrows={load_nrows}...")
+df_original = load_and_preprocess_data(CSV_URL, nrows=load_nrows if load_nrows > 0 else None)
 print(f"DEBUG: df_original cargado. Vacío: {df_original.empty}")
 
 if df_original.empty:
-    st.warning("No se pudieron cargar los datos o el DataFrame está vacío. No se puede continuar con el análisis.")
+    st.warning("No se pudieron cargar los datos o el DataFrame está vacío. Ajusta tus filtros o el número de filas a cargar para ver datos en esta sección.")
     st.stop()
 
 print("DEBUG: Iniciando sección de filtros de la barra lateral...")
@@ -268,7 +279,7 @@ with tab_eda:
 
             st.header("2. Manejo de Valores Faltantes (NaNs) (Filtros Aplicados)")
             missing_data_filtered = df_filtered.isnull().sum()
-            missing_data_filtered = missing_data_filtered[missing_data_filtered > 0].sort_values(ascending=False) # Corrected variable name
+            missing_data_filtered = missing_data_filtered[missing_data_filtered > 0].sort_values(ascending=False)
             missing_percentage_filtered = (df_filtered.isnull().sum() / len(df_filtered)) * 100
             missing_info_filtered = pd.DataFrame({
                 'Total Faltantes': missing_data_filtered,
@@ -406,7 +417,7 @@ with tab_clean:
                     key="impute_numeric_method"
                 )
                 if imputation_method != "No imputar":
-                    for col in numeric_cols_nan:
+                    for col in numeric_cols_with_nan: # Corrected variable name from numeric_cols_nan to numeric_cols_with_nan
                         if imputation_method == "Mediana":
                             val = df_cleaned_temp[col].median()
                         else:
@@ -773,3 +784,4 @@ with tab_modeling:
         st.error(f"Error en la pestaña 'Modelado Predictivo': {e}")
         st.exception(e)
         print(f"ERROR: Pestaña 'Modelado Predictivo' falló: {e}")
+
