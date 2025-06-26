@@ -30,8 +30,22 @@ st.markdown("---")
 # ¡IMPORTANTE! Asegúrate de que esta URL sea la correcta para tu archivo .parquet
 PARQUET_URL = "https://media.githubusercontent.com/media/JulianTorrest/prueba_real_state/main/data/Real_Estate_Sales_2001-2022_GL.parquet"
 
+# --- Sidebar para el número de filas a cargar ---
+st.sidebar.header("Opciones de Carga de Datos")
+load_nrows = st.sidebar.number_input(
+    "Número de filas a cargar del archivo Parquet (0 para todas):",
+    min_value=0,
+    # El valor máximo se ajusta, pero para 25MB, incluso 500k-1M filas pueden ser mucho
+    # Se recomienda empezar con un número bajo como 100000 o incluso 50000 para probar.
+    max_value=5000000, # Un valor alto para datasets muy grandes, ajústalo si hay problemas
+    value=100000, # Valor por defecto recomendado para evitar OOM inicial
+    step=10000,
+    help="Cargar menos filas puede prevenir errores de memoria en entornos de despliegue con recursos limitados."
+)
+st.sidebar.markdown("---")
+
 @st.cache_data(show_spinner="Cargando y preprocesando datos...")
-def load_and_preprocess_data(url):
+def load_and_preprocess_data(url, nrows=None):
     """
     Carga el archivo Parquet y realiza el preprocesamiento necesario.
     Al usar Parquet, no es necesario especificar 'dtype' ni 'low_memory' como en CSV,
@@ -40,8 +54,8 @@ def load_and_preprocess_data(url):
     print("DEBUG: [load_and_preprocess_data] Iniciando carga y preprocesamiento de datos desde Parquet...")
     df = pd.DataFrame() # Initialize df to ensure it exists even if read_parquet fails
     try:
-        print(f"DEBUG: [load_and_preprocess_data] Intentando leer archivo Parquet desde: {url}")
-        df = pd.read_parquet(url) # Lee el archivo Parquet
+        print(f"DEBUG: [load_and_preprocess_data] Intentando leer archivo Parquet desde: {url}. Filas a cargar: {nrows if nrows else 'Todas'}")
+        df = pd.read_parquet(url, nrows=nrows) # Pasa el parámetro nrows a read_parquet
         print(f"DEBUG: [load_and_preprocess_data] Archivo Parquet cargado exitosamente. Filas: {df.shape[0]}, Columnas: {df.shape[1]}")
 
         print("DEBUG: [load_and_preprocess_data] Renombrando columnas...")
@@ -86,13 +100,13 @@ def load_and_preprocess_data(url):
         st.exception(e)
         return pd.DataFrame()
 
-# --- Cargar los Datos Originales (ahora desde Parquet) ---
-print(f"DEBUG: Llamando a load_and_preprocess_data con URL de Parquet: {PARQUET_URL}...")
-df_original = load_and_preprocess_data(PARQUET_URL)
+# --- Cargar los Datos Originales (ahora desde Parquet con opción de nrows) ---
+print(f"DEBUG: Llamando a load_and_preprocess_data con URL de Parquet: {PARQUET_URL} y nrows={load_nrows}...")
+df_original = load_and_preprocess_data(PARQUET_URL, nrows=load_nrows if load_nrows > 0 else None)
 print(f"DEBUG: df_original cargado. Vacío: {df_original.empty}")
 
 if df_original.empty:
-    st.warning("No se pudieron cargar los datos o el DataFrame está vacío. No se puede continuar con el análisis.")
+    st.warning("No se pudieron cargar los datos o el DataFrame está vacío. Ajusta tus filtros o el número de filas a cargar para ver datos en esta sección.")
     st.stop()
 
 print("DEBUG: Iniciando sección de filtros de la barra lateral...")
