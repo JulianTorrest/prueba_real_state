@@ -33,8 +33,7 @@ def load_and_preprocess_data(url):
     Carga el archivo CSV y realiza un preprocesamiento inicial.
     """
     try:
-        #df = pd.read_csv(url)
-        df = pd.read_csv(url, low_memory=False)
+        df = pd.read_csv(url)
 
         # Renombrar columnas para facilitar el uso
         df.columns = df.columns.str.strip().str.replace(' ', '_').str.replace('_-', '_').str.replace('.', '', regex=False).str.lower()
@@ -111,7 +110,7 @@ else:
 if 'sale_month' in df_filtered.columns and not df_filtered['sale_month'].isnull().all():
     all_months = df_filtered['sale_month'].dropna().unique().tolist()
     month_order = ["January", "February", "March", "April", "May", "June",
-                   "July", "August", "September", "October", "November", "December", "Unknown"] # Include 'Unknown'
+                    "July", "August", "September", "October", "November", "December", "Unknown"] # Include 'Unknown'
     all_months_sorted = [m for m in month_order if m in all_months]
 
     selected_months = st.sidebar.multiselect(
@@ -159,7 +158,7 @@ if 'residential_type' in df_filtered.columns and not df_filtered['residential_ty
         all_residential_types = df_filtered['residential_type'].dropna().unique().tolist()
         # Filter out 'Unknown' if it's the only type left due to filtering
         if 'Unknown' in all_residential_types and len(all_residential_types) > 1:
-             all_residential_types.remove('Unknown') # Remove 'Unknown' for better default selection
+            all_residential_types.remove('Unknown') # Remove 'Unknown' for better default selection
         all_residential_types.sort()
         selected_residential_types = st.sidebar.multiselect(
             "Selecciona Tipo Residencial:",
@@ -235,8 +234,8 @@ with tab_eda:
             top_towns_filtered = df_filtered['town'].value_counts().nlargest(20).reset_index()
             top_towns_filtered.columns = ['Town', 'Número de Ventas']
             fig_towns_filtered = px.bar(top_towns_filtered, x='Town', y='Número de Ventas',
-                                       title='Top 20 Ciudades por Número de Ventas (Filtradas)',
-                                       labels={'Town': 'Ciudad', 'Número de Ventas': 'Recuento de Ventas'})
+                                         title='Top 20 Ciudades por Número de Ventas (Filtradas)',
+                                         labels={'Town': 'Ciudad', 'Número de Ventas': 'Recuento de Ventas'})
             st.plotly_chart(fig_towns_filtered, use_container_width=True)
         else:
             st.info("Columna 'town' no disponible o insuficiente para este gráfico en los datos filtrados.")
@@ -247,8 +246,8 @@ with tab_eda:
             prop_type_counts_filtered = df_filtered['property_type'].value_counts().reset_index()
             prop_type_counts_filtered.columns = ['Property Type', 'Count']
             fig_prop_type_filtered = px.pie(prop_type_counts_filtered, values='Count', names='Property Type',
-                                           title='Distribución por Tipo de Propiedad (Filtradas)',
-                                           hole=0.3)
+                                             title='Distribución por Tipo de Propiedad (Filtradas)',
+                                             hole=0.3)
             st.plotly_chart(fig_prop_type_filtered, use_container_width=True)
         else:
             st.info("Columna 'property_type' no disponible o insuficiente para este gráfico en los datos filtrados.")
@@ -257,9 +256,9 @@ with tab_eda:
         st.subheader("Distribución de 'Sale Amount' (Precio de Venta) (Filtrada)")
         if 'sale_amount' in df_filtered.columns and not df_filtered['sale_amount'].isnull().all():
             fig_sale_amount_filtered = px.histogram(df_filtered, x='sale_amount', nbins=50,
-                                                   title='Distribución de Precio de Venta (Filtrada)',
-                                                   labels={'sale_amount': 'Precio de Venta'},
-                                                   log_y=True)
+                                                    title='Distribución de Precio de Venta (Filtrada)',
+                                                    labels={'sale_amount': 'Precio de Venta'},
+                                                    log_y=True)
             st.plotly_chart(fig_sale_amount_filtered, use_container_width=True)
         else:
             st.info("Columna 'sale_amount' no disponible o insuficiente para este gráfico en los datos filtrados.")
@@ -449,9 +448,9 @@ with tab_outliers:
                 st.dataframe(outliers_sale_amount[['town', 'address', 'sale_amount', 'list_year']].head())
 
                 fig_boxplot_sale = px.box(df_outlier, y='sale_amount',
-                                     title='Box Plot de Precio de Venta con Outliers',
-                                     labels={'sale_amount': 'Precio de Venta'},
-                                     points="outliers")
+                                          title='Box Plot de Precio de Venta con Outliers',
+                                          labels={'sale_amount': 'Precio de Venta'},
+                                          points="outliers")
                 st.plotly_chart(fig_boxplot_sale, use_container_width=True)
 
                 if st.checkbox("¿Remover outliers de 'Sale Amount' para el análisis subsiguiente?", key="remove_sale_outliers"):
@@ -479,9 +478,9 @@ with tab_outliers:
                 st.dataframe(outliers_assessed[['town', 'address', 'assessed_value', 'list_year']].head())
 
                 fig_boxplot_assessed = px.box(df_outlier, y='assessed_value',
-                                     title='Box Plot de Valor Fiscal con Outliers',
-                                     labels={'assessed_value': 'Valor Fiscal'},
-                                     points="outliers")
+                                          title='Box Plot de Valor Fiscal con Outliers',
+                                          labels={'assessed_value': 'Valor Fiscal'},
+                                          points="outliers")
                 st.plotly_chart(fig_boxplot_assessed, use_container_width=True)
             else:
                 st.info("No se detectaron outliers significativos en 'assessed_value' con el método IQR en el DataFrame actual.")
@@ -504,10 +503,10 @@ with tab_bivariate:
         st.subheader("1. Precio de Venta vs. Valor Fiscal por Tipo de Propiedad")
         if 'assessed_value' in df_filtered.columns and 'sale_amount' in df_filtered.columns and 'property_type' in df_filtered.columns:
             fig_scatter_bivar = px.scatter(df_filtered, x='assessed_value', y='sale_amount', color='property_type',
-                                         title='Precio de Venta vs. Valor Fiscal por Tipo de Propiedad',
-                                         labels={'assessed_value': 'Valor Fiscal', 'sale_amount': 'Precio de Venta'},
-                                         hover_data=['town', 'address'],
-                                         log_x=True, log_y=True, opacity=0.7)
+                                           title='Precio de Venta vs. Valor Fiscal por Tipo de Propiedad',
+                                           labels={'assessed_value': 'Valor Fiscal', 'sale_amount': 'Precio de Venta'},
+                                           hover_data=['town', 'address'],
+                                           log_x=True, log_y=True, opacity=0.7)
             st.plotly_chart(fig_scatter_bivar, use_container_width=True)
             st.info("Se observa la correlación positiva. El color muestra cómo se agrupan los tipos de propiedad.")
         else:
@@ -516,7 +515,7 @@ with tab_bivariate:
         st.subheader("2. Distribución de Precio de Venta por Mes")
         if 'sale_month' in df_filtered.columns and 'sale_amount' in df_filtered.columns:
             month_order = ["January", "February", "March", "April", "May", "June",
-                           "July", "August", "September", "October", "November", "December", "Unknown"]
+                            "July", "August", "September", "October", "November", "December", "Unknown"]
             df_plot = df_filtered.copy()
             # Ensure 'Unknown' is in categories if present
             current_months = df_plot['sale_month'].dropna().unique().tolist()
@@ -539,10 +538,10 @@ with tab_bivariate:
         if len(numeric_cols_bivar) >= 2:
             corr_matrix = df_filtered[numeric_cols_bivar].corr()
             fig_corr_heatmap = px.imshow(corr_matrix,
-                                         text_auto=True,
-                                         aspect="auto",
-                                         color_continuous_scale='RdBu_r',
-                                         title='Matriz de Correlación Numérica (Filtrada)')
+                                          text_auto=True,
+                                          aspect="auto",
+                                          color_continuous_scale='RdBu_r',
+                                          title='Matriz de Correlación Numérica (Filtrada)')
             st.plotly_chart(fig_corr_heatmap, use_container_width=True)
             st.info("Muestra la fuerza y dirección de la relación lineal entre pares de variables numéricas.")
         else:
@@ -552,108 +551,165 @@ with tab_bivariate:
 with tab_modeling:
     st.header("Modelado Predictivo (Esbozo)")
     st.markdown("""
-        Esta sección demuestra un flujo de trabajo básico para construir un modelo de regresión
-        para predecir el **Precio de Venta (`sale_amount`)**.
-        Los pasos incluyen selección de características, codificación y entrenamiento de un **Random Forest Regressor**.
+        Esta sección demuestra un flujo de trabajo básico para construir un modelo
+        predictivo del precio de venta (`sale_amount`) utilizando un **RandomForestRegressor**.
+        Se incluyen pasos de preparación de datos, entrenamiento del modelo y evaluación.
+        Ten en cuenta que este es un **esbozo simplificado** y no un modelo de producción optimizado.
     """)
 
     if df_filtered.empty:
         st.warning("El DataFrame filtrado está vacío. Ajusta tus filtros para ver datos en esta sección.")
     else:
-        df_model = df_filtered.copy() # Copia para el modelado
+        st.subheader("Preparación de Datos para el Modelado")
+        st.info("Se creará un subconjunto de datos para el modelado, aplicando one-hot encoding y escalado.")
 
-        st.subheader("1. Preprocesamiento para el Modelo")
-        st.write("##### Manejo de NaNs (Estrategia para el Modelo)")
-        # Para el modelado, seremos más agresivos con los NaNs en columnas clave
-        cols_for_model = ['assessed_value', 'list_year', 'property_type', 'town', 'residential_type', 'sale_amount']
+        # Realiza una copia del DataFrame filtrado para no afectar otras pestañas
+        df_model = df_filtered.copy()
+
+        # Seleccionar características y la variable objetivo
+        # Incluir columnas que tienen sentido para predecir 'sale_amount'
+        # Excluir 'date_recorded' y 'address' (que son identificadores o no útiles directamente)
+        # Asegurarse de que 'sale_year' esté incluido, ya que es numérico y relevante.
+        # Excluir 'sales_ratio' ya que es una relación entre 'sale_amount' y 'assessed_value'
+        # y su inclusión podría generar fuga de información o multicolinealidad.
+
+        # Columnas numéricas que se usarán como características
+        # 'list_year' puede estar ausente si el dataset no lo tiene
+        numerical_features = ['assessed_value', 'list_year']
+        # Asegurarse de que 'list_year' exista y sea numérico, si no, quitarlo de las características
+        if 'list_year' not in df_model.columns:
+            st.warning("La columna 'list_year' no está presente y no se incluirá como característica numérica.")
+            numerical_features.remove('list_year')
+        else:
+            # Asegurarse de que 'list_year' sea numérico y manejar NaNs
+            df_model['list_year'] = pd.to_numeric(df_model['list_year'], errors='coerce')
+            # Imputar NaNs en 'list_year' con la mediana si es necesario
+            if df_model['list_year'].isnull().any():
+                median_list_year = df_model['list_year'].median()
+                df_model['list_year'].fillna(median_list_year, inplace=True)
+                st.info(f"Valores faltantes en 'list_year' imputados con la mediana: {int(median_list_year)}.")
         
-        # Ensure all columns in `cols_for_model` actually exist in df_model
-        cols_for_model_existing = [col for col in cols_for_model if col in df_model.columns]
-        df_model = df_model[cols_for_model_existing].dropna() # Eliminar filas con NaNs en estas columnas
+        # Columnas categóricas que se usarán como características
+        # 'residential_type' ya tiene 'Unknown' manejado en preprocesamiento
+        categorical_features = ['town', 'property_type', 'residential_type', 'sale_month']
+        # Filtrar características categóricas que quizás no existan en el dataframe filtrado
+        categorical_features = [col for col in categorical_features if col in df_model.columns]
+
+        target = 'sale_amount'
+
+        # Limpieza de NaNs para las columnas relevantes antes del modelado
+        # Para RandomForest, es mejor eliminar filas con NaNs en X o y
+        features_for_model = numerical_features + categorical_features + [target]
+        df_model.dropna(subset=features_for_model, inplace=True)
 
         if df_model.empty:
-            st.warning("El DataFrame para el modelado está vacío después de eliminar NaNs. Ajusta tus filtros o reconsidera las columnas a usar.")
+            st.warning("Después de la preparación, el DataFrame para el modelado está vacío. No se puede entrenar el modelo.")
             st.stop()
 
-        st.write("##### Codificación de Variables Categóricas (One-Hot Encoding)")
-        categorical_features_for_model = ['property_type', 'town', 'residential_type']
-        # Asegurarse de que las columnas existen antes de codificar
-        categorical_features_for_model = [col for col in categorical_features_for_model if col in df_model.columns]
+        st.write(f"Filas disponibles para modelado después de limpiar NaNs: {df_model.shape[0]}")
 
-        if categorical_features_for_model:
-            df_model = pd.get_dummies(df_model, columns=categorical_features_for_model, drop_first=True)
-            st.success("Variables categóricas codificadas con One-Hot Encoding.")
-        else:
-            st.info("No hay columnas categóricas válidas para One-Hot Encoding.")
+        # One-Hot Encoding para variables categóricas
+        # st.write(f"Aplicando One-Hot Encoding a: {categorical_features}")
+        df_model_encoded = pd.get_dummies(df_model, columns=categorical_features, drop_first=True, dtype=int)
+        st.write(f"Número de columnas después de One-Hot Encoding: {df_model_encoded.shape[1]}")
 
-        st.write("##### Escalado de Características Numéricas")
-        # Identify numeric columns for scaling that are not the target and exist in the dataframe
-        numeric_features_for_scaling = [col for col in ['assessed_value', 'list_year'] if col in df_model.columns and col != 'sale_amount'] # explicit target name for safety
+        # Separar X y y
+        # Asegurarse de que 'sale_amount' esté en las columnas después de encoding
+        if target not in df_model_encoded.columns:
+            st.error(f"La columna objetivo '{target}' no se encontró en el DataFrame después del encoding.")
+            st.stop()
 
-        if numeric_features_for_scaling:
+        X = df_model_encoded.drop(columns=[target])
+        y = df_model_encoded[target]
+
+        # Asegurarse de que todas las columnas numéricas estén presentes en X después del one-hot encoding
+        final_numerical_features = [col for col in numerical_features if col in X.columns]
+        if not final_numerical_features:
+            st.warning("No se encontraron características numéricas válidas para el escalado. Esto podría afectar el rendimiento del modelo.")
+
+        # Escalar características numéricas
+        if final_numerical_features:
+            st.write(f"Escalando características numéricas: {final_numerical_features}")
             scaler = StandardScaler()
-            df_model[numeric_features_for_scaling] = scaler.fit_transform(df_model[numeric_features_for_scaling])
-            st.success("Características numéricas escaladas.")
-        else:
-            st.info("No hay columnas numéricas válidas para escalado.")
+            X[final_numerical_features] = scaler.fit_transform(X[final_numerical_features])
+
+        # Dividir los datos en conjuntos de entrenamiento y prueba
+        test_size = st.slider("Tamaño del conjunto de prueba (Test Size):", min_value=0.1, max_value=0.5, value=0.2, step=0.05)
+        random_state = st.slider("Semilla aleatoria (Random State):", min_value=0, max_value=100, value=42, step=1)
+
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=random_state)
+
+        st.write(f"Tamaño del conjunto de entrenamiento: {X_train.shape[0]} muestras")
+        st.write(f"Tamaño del conjunto de prueba: {X_test.shape[0]} muestras")
+
+        st.markdown("---")
+        st.subheader("Entrenamiento del Modelo RandomForestRegressor")
+        st.info("El RandomForestRegressor es un modelo de ensemble robusto, ideal para problemas de regresión.")
+
+        n_estimators = st.slider("Número de estimadores (árboles):", min_value=50, max_value=500, value=100, step=50)
+        max_depth = st.slider("Profundidad máxima de los árboles (0 para ilimitado):", min_value=0, max_value=20, value=10, step=1)
+        # Convert 0 to None for max_depth in RandomForestRegressor
+        actual_max_depth = None if max_depth == 0 else max_depth
 
 
-        st.subheader("2. Selección de Características y División de Datos")
-        target = 'sale_amount'
-        
-        # Check if target column exists after preprocessing
-        if target not in df_model.columns:
-            st.warning(f"La columna objetivo '{target}' no está disponible después del preprocesamiento.")
-            st.stop()
-
-        # Quitar la variable objetivo de las características
-        X = df_model.drop(columns=[target])
-        y = df_model[target]
-
-        # Ensure X is not empty after dropping target
-        if X.empty:
-            st.warning("No hay características disponibles para el entrenamiento del modelo después del preprocesamiento.")
-            st.stop()
-        
-        st.write(f"**Características (X) para el modelo:**")
-        st.write(X.columns.tolist())
-        st.write(f"**Variable Objetivo (y):** {target}")
-
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-        st.subheader("3. Entrenamiento y Evaluación del Modelo (Random Forest Regressor)")
         if st.button("Entrenar Modelo"):
-            # Check if training data is valid
-            if X_train.shape[0] == 0 or X_train.shape[1] == 0:
-                st.error("No hay datos de entrenamiento válidos para el modelo. Ajusta los filtros o los datos de entrada.")
-            else:
-                model = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
+            # Mostrar un spinner mientras el modelo se entrena
+            with st.spinner("Entrenando RandomForestRegressor... Esto puede tomar un momento."):
+                model = RandomForestRegressor(n_estimators=n_estimators, max_depth=actual_max_depth, random_state=random_state, n_jobs=-1)
                 model.fit(X_train, y_train)
-                st.success("Modelo Random Forest Regressor entrenado exitosamente.")
 
-                y_pred = model.predict(X_test)
-                mae = mean_absolute_error(y_test, y_pred)
-                r2 = r2_score(y_test, y_pred)
+            st.success("¡Modelo entrenado exitosamente!")
 
-                st.write(f"**Error Absoluto Medio (MAE):** ${mae:,.2f}")
-                st.write(f"**Coeficiente de Determinación (R2):** {r2:.4f}")
+            st.markdown("---")
+            st.subheader("Evaluación del Modelo")
+            y_pred = model.predict(X_test)
 
-                st.info("Un R2 cercano a 1 indica que el modelo explica una gran parte de la varianza del precio de venta.")
-                st.info("Un MAE indica el error promedio en las predicciones del precio de venta.")
+            mae = mean_absolute_error(y_test, y_pred)
+            r2 = r2_score(y_test, y_pred)
 
-                st.subheader("Importancia de las Características (Top 10)")
-                # Ensure feature importances are shown only if model was trained and features exist
-                if hasattr(model, 'feature_importances_') and not X.columns.empty:
-                    feature_importances = pd.Series(model.feature_importances_, index=X.columns).sort_values(ascending=False)
-                    fig_importance = px.bar(feature_importances.head(10),
-                                            title="Importancia de las Características en el Modelo",
-                                            labels={'value': 'Importancia', 'index': 'Característica'})
-                    st.plotly_chart(fig_importance, use_container_width=True)
-                else:
-                    st.info("No se pudo calcular la importancia de las características, o no hay características para mostrar.")
+            st.write(f"**Error Absoluto Medio (MAE):** ${mae:,.2f}")
+            st.write(f"**Coeficiente de Determinación (R²):** {r2:.4f}")
 
+            st.info("""
+                **Interpretación:**
+                * **MAE:** Representa la magnitud promedio de los errores en las predicciones. Un valor más bajo es mejor.
+                * **R²:** Indica la proporción de la varianza en la variable dependiente que es predecible a partir de las variables independientes. Un valor más cercano a 1 indica un mejor ajuste del modelo.
+            """)
+
+            st.subheader("Visualización de Predicciones vs. Valores Reales")
+            # Create a dataframe for plotting actual vs predicted values
+            results_df = pd.DataFrame({'Actual': y_test, 'Predicted': y_pred})
+            # Sample for performance if the test set is too large
+            results_df = results_df.sample(min(1000, len(results_df)), random_state=42)
+
+            fig_pred_vs_actual = px.scatter(results_df, x='Actual', y='Predicted',
+                                            title='Valores Reales vs. Predicciones',
+                                            labels={'Actual': 'Precio de Venta Real', 'Predicted': 'Precio de Venta Predicho'})
+            fig_pred_vs_actual.add_trace(go.Scatter(x=[min(y_test), max(y_test)], y=[min(y_test), max(y_test)],
+                                                    mode='lines', name='Línea Ideal (Actual = Predicho)',
+                                                    line=dict(color='red', dash='dash')))
+            st.plotly_chart(fig_pred_vs_actual, use_container_width=True)
+
+            st.subheader("Importancia de las Características")
+            if hasattr(model, 'feature_importances_'):
+                feature_importances = pd.DataFrame({
+                    'Feature': X.columns,
+                    'Importance': model.feature_importances_
+                }).sort_values(by='Importance', ascending=False)
+
+                fig_feature_imp = px.bar(feature_importances.head(15), x='Importance', y='Feature', orientation='h',
+                                        title='Top 15 Características Más Importantes',
+                                        labels={'Importance': 'Importancia', 'Feature': 'Característica'})
+                st.plotly_chart(fig_feature_imp, use_container_width=True)
+            else:
+                st.info("El modelo no soporta la extracción de importancia de características.")
+
+            st.info("""
+                **Próximos pasos posibles:**
+                * Ajustar hiperparámetros del modelo (Grid Search, Random Search).
+                * Experimentar con diferentes características o ingeniería de características más compleja.
+                * Probar otros algoritmos de machine learning.
+                * Realizar validación cruzada para una evaluación más robusta.
+            """)
         else:
-            st.info("Haz clic en 'Entrenar Modelo' para ver los resultados.")
-
-    st.markdown("---")
-    st.caption("Aplicación creada con Streamlit. Datos de JulianTorrest/prueba_real_state.")
+            st.info("Haz clic en 'Entrenar Modelo' para iniciar el proceso de modelado.")
