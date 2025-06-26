@@ -11,7 +11,7 @@ from sklearn.preprocessing import StandardScaler
 # --- Configuración de la aplicación Streamlit ---
 st.set_page_config(
     page_title="Análisis Completo de Ventas Inmobiliarias",
-    page_icon="🏠",
+    page_icon="�",
     layout="wide" # Usa todo el ancho de la pantalla
 )
 
@@ -31,16 +31,38 @@ CSV_URL = "https://media.githubusercontent.com/media/JulianTorrest/prueba_real_s
 def load_and_preprocess_data(url):
     """
     Carga el archivo CSV y realiza un preprocesamiento inicial.
+    Se han especificado los tipos de datos para evitar la advertencia de 'DtypeWarning'
+    y asegurar la correcta interpretación de las columnas.
     """
     try:
-        df = pd.read_csv(url)
+        # Especificar los tipos de datos directamente para las columnas problemáticas
+        # Esto ayuda a evitar la DtypeWarning y asegura la consistencia de los datos.
+        # Las columnas 8-14 son (0-indexed): 7, 8, 9, 10, 11, 12, 13
+        # Sales Ratio (columna 8) -> float
+        # Property Type (columna 9) -> string
+        # Residential Type (columna 10) -> string
+        # Non Use Code (columna 11) -> string (para manejar NaN y valores mixtos)
+        # Assessor Remarks (columna 12) -> string (para manejar NaN y valores mixtos)
+        # OPM remarks (columna 13) -> string (para manejar NaN y valores mixtos)
+        # Location (columna 14) -> string (para manejar NaN y valores mixtos)
+        df = pd.read_csv(url, dtype={
+            'Sales Ratio': float,
+            'Property Type': str,
+            'Residential Type': str,
+            'Non Use Code': str,
+            'Assessor Remarks': str,
+            'OPM remarks': str,
+            'Location': str
+        }, low_memory=False) # low_memory=False se usa como un fallback adicional, aunque dtypes es más específico
 
         # Renombrar columnas para facilitar el uso
         df.columns = df.columns.str.strip().str.replace(' ', '_').str.replace('_-', '_').str.replace('.', '', regex=False).str.lower()
 
         # Conversión de tipos de datos
+        # pd.to_numeric con errors='coerce' maneja cualquier valor no numérico a NaN
         df['assessed_value'] = pd.to_numeric(df['assessed_value'], errors='coerce')
         df['sale_amount'] = pd.to_numeric(df['sale_amount'], errors='coerce')
+        # 'sales_ratio' ya se definió como float en dtype, pero lo volvemos a asegurar
         df['sales_ratio'] = pd.to_numeric(df['sales_ratio'], errors='coerce')
 
         # Convert date_recorded to datetime, handle errors, and remove timezone
@@ -63,12 +85,11 @@ def load_and_preprocess_data(url):
         df['date_recorded'] = df['date_recorded'].dt.strftime('%Y-%m-%d %H:%M:%S').fillna('') # Or just '%Y-%m-%d'
 
         # Limpiar columnas categóricas para filtros y análisis
-        for col in ['town', 'property_type', 'residential_type']:
+        for col in ['town', 'property_type', 'residential_type', 'non_use_code', 'assessor_remarks', 'opm_remarks', 'location']:
             if col in df.columns:
+                # Asegurar que sean strings y manejar 'nan' literal a np.nan, luego rellenar con 'Unknown'
                 df[col] = df[col].astype(str).str.strip().replace('nan', np.nan)
-                # FIX: Fill NaNs for categorical features with 'Unknown' for PyArrow compatibility
-                # Changed: df[col].fillna('Unknown', inplace=True)
-                df[col] = df[col].fillna('Unknown')
+                df[col] = df[col].fillna('Unknown') # Rellena NaNs con 'Unknown' para coherencia
 
         return df
     except Exception as e:
