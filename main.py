@@ -29,7 +29,7 @@ PARQUET_URL = "https://media.githubusercontent.com/media/JulianTorrest/prueba_re
 
 # --- Cargar solo un millón de registros del archivo Parquet ---
 @st.cache_data
-def load_limited_data(url, num_rows=1_000_000):
+def load_limited_data(url, num_rows=500_000):
     try:
         # Usa pyarrow para leer solo las primeras 'num_rows' filas
         # Esto es mucho más eficiente para archivos grandes
@@ -44,7 +44,7 @@ def load_limited_data(url, num_rows=1_000_000):
         return pd.DataFrame() # Retorna un DataFrame vacío en caso de error
 
 # Carga los datos limitados
-df = load_limited_data(PARQUET_URL, num_rows=1_000_000)
+df = load_limited_data(PARQUET_URL, num_rows=500_000)
 
 # --- Verificar si los datos se cargaron correctamente antes de continuar ---
 if not df.empty:
