@@ -52,15 +52,18 @@ if not df.empty:
     st.dataframe(df.head())
 
     st.subheader("Información básica de los datos:")
-    # Para mostrar info() en Streamlit, puedes capturar la salida o mostrar detalles relevantes.
-    # Aquí un ejemplo simple de mostrar info relevante:
     st.write(f"Número total de registros cargados: **{len(df):,}**")
     st.write(f"Número de columnas: **{df.shape[1]}**")
     st.write("Columnas y tipo de datos:")
-    st.dataframe(df.dtypes.reset_index().rename(columns={'index': 'Columna', 0: 'Tipo de Dato'}))
+    
+    # --- MODIFICACIÓN CLAVE AQUÍ ---
+    # Convertir explícitamente la columna 'Tipo de Dato' a string
+    column_types_df = df.dtypes.reset_index().rename(columns={'index': 'Columna', 0: 'Tipo de Dato'})
+    column_types_df['Tipo de Dato'] = column_types_df['Tipo de Dato'].astype(str)
+    st.dataframe(column_types_df)
+    # --- FIN DE LA MODIFICACIÓN ---
 
     # --- Aquí continuarías con el resto de tu análisis EDA, limpieza y modelado ---
-    # Por ejemplo, un gráfico simple para demostrar:
     if 'SaleAmount' in df.columns:
         st.subheader("Distribución del Monto de Venta (Muestra):")
         fig = px.histogram(df, x='SaleAmount', nbins=50, title='Distribución de SaleAmount')
@@ -73,6 +76,8 @@ if not df.empty:
 
 else:
     st.warning("No se pudieron cargar los datos. Por favor, revisa la URL y el archivo Parquet.")
+
+
 
 # --- Sidebar para el número de filas a cargar ---
 # NOTA: El argumento 'nrows' no es compatible con pd.read_parquet.
