@@ -1,5 +1,3 @@
-print("DEBUG: Script started.") # Added for very early debugging
-
 import pandas as pd
 import streamlit as st
 import plotly.express as px
@@ -27,8 +25,54 @@ st.markdown("""
 st.markdown("---")
 
 # --- Define la URL de tu archivo PARQUET en GitHub ---
-# ¡IMPORTANTE! Asegúrate de que esta URL sea la correcta para tu archivo .parquet
 PARQUET_URL = "https://media.githubusercontent.com/media/JulianTorrest/prueba_real_state/main/data/Real_Estate_Sales_2001-2022_GL.parquet"
+
+# --- Cargar solo un millón de registros del archivo Parquet ---
+@st.cache_data
+def load_limited_data(url, num_rows=1_000_000):
+    try:
+        # Usa pyarrow para leer solo las primeras 'num_rows' filas
+        # Esto es mucho más eficiente para archivos grandes
+        table = pd.read_parquet(url, engine='pyarrow')
+        # Limita el DataFrame a las primeras 'num_rows' filas
+        df = table.head(num_rows)
+        st.success(f"Se han cargado exitosamente los primeros {len(df):,} registros del archivo Parquet.")
+        return df
+    except Exception as e:
+        st.error(f"Error al cargar los datos: {e}")
+        st.info("Asegúrate de que la URL del archivo Parquet es correcta y accesible.")
+        return pd.DataFrame() # Retorna un DataFrame vacío en caso de error
+
+# Carga los datos limitados
+df = load_limited_data(PARQUET_URL, num_rows=1_000_000)
+
+# --- Verificar si los datos se cargaron correctamente antes de continuar ---
+if not df.empty:
+    st.subheader("Vista previa de los datos cargados (primeros 5 registros):")
+    st.dataframe(df.head())
+
+    st.subheader("Información básica de los datos:")
+    # Para mostrar info() en Streamlit, puedes capturar la salida o mostrar detalles relevantes.
+    # Aquí un ejemplo simple de mostrar info relevante:
+    st.write(f"Número total de registros cargados: **{len(df):,}**")
+    st.write(f"Número de columnas: **{df.shape[1]}**")
+    st.write("Columnas y tipo de datos:")
+    st.dataframe(df.dtypes.reset_index().rename(columns={'index': 'Columna', 0: 'Tipo de Dato'}))
+
+    # --- Aquí continuarías con el resto de tu análisis EDA, limpieza y modelado ---
+    # Por ejemplo, un gráfico simple para demostrar:
+    if 'SaleAmount' in df.columns:
+        st.subheader("Distribución del Monto de Venta (Muestra):")
+        fig = px.histogram(df, x='SaleAmount', nbins=50, title='Distribución de SaleAmount')
+        st.plotly_chart(fig)
+    else:
+        st.warning("La columna 'SaleAmount' no se encontró en los datos cargados. Ajusta tus columnas.")
+
+    st.markdown("---")
+    st.success("¡Datos cargados y listos para el análisis!")
+
+else:
+    st.warning("No se pudieron cargar los datos. Por favor, revisa la URL y el archivo Parquet.")
 
 # --- Sidebar para el número de filas a cargar ---
 # NOTA: El argumento 'nrows' no es compatible con pd.read_parquet.
